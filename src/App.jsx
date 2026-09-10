@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LanguageProvider } from './context/LanguageContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { ShopProvider } from './context/ShopContext';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // Pages
+import AlphaXLandingPage from './pages/AlphaXLandingPage';
 import CollectionPage from './pages/CollectionPage';
 import Dashboard from './pages/Dashboard';
 import ClientsPage from './pages/ClientsPage';
@@ -42,67 +44,71 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <LanguageProvider>
-          <BrowserRouter>
-            <Layout
-              viewMode={viewMode}
-              setViewMode={setViewMode}
-              activeMonth={activeMonth}
-              setActiveMonth={setActiveMonth}
-              monthsList={monthsList}
-              refreshData={loadMonths}
-            >
-              <ErrorBoundary>
-                <Routes>
-                  <Route
-                    path="/"
-                    element={
-                      <CollectionPage
-                        activeMonth={activeMonth}
-                        viewMode={viewMode}
-                        onDataChanged={loadMonths}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/collection"
-                    element={
-                      <CollectionPage
-                        activeMonth={activeMonth}
-                        viewMode={viewMode}
-                        onDataChanged={loadMonths}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/dashboard"
-                    element={<Dashboard activeMonth={activeMonth} />}
-                  />
-                  <Route
-                    path="/clients"
-                    element={<ClientsPage activeMonth={activeMonth} />}
-                  />
-                  <Route
-                    path="/closed"
-                    element={<ClosedClientsPage />}
-                  />
-                  <Route
-                    path="/excel"
-                    element={
-                      <ExcelPage
-                        activeMonth={activeMonth}
-                        onDataChanged={loadMonths}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/settings"
-                    element={<SettingsPage />}
-                  />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </ErrorBoundary>
-            </Layout>
-          </BrowserRouter>
+          <ShopProvider>
+            <BrowserRouter>
+              <Routes>
+                {/* 1. AlphaX Solutions Flagship Apple Luxury Portal */}
+                <Route path="/" element={<AlphaXLandingPage />} />
+                <Route path="/portal" element={<AlphaXLandingPage />} />
+
+                {/* 2. Enterprise Microfinance Operational Workspace */}
+                <Route
+                  path="/*"
+                  element={
+                    <Layout
+                      viewMode={viewMode}
+                      setViewMode={setViewMode}
+                      activeMonth={activeMonth}
+                      setActiveMonth={setActiveMonth}
+                      monthsList={monthsList}
+                      refreshData={loadMonths}
+                    >
+                      <ErrorBoundary>
+                        <Routes>
+                          <Route
+                            path="collection"
+                            element={
+                              <CollectionPage
+                                activeMonth={activeMonth}
+                                viewMode={viewMode}
+                                onDataChanged={loadMonths}
+                              />
+                            }
+                          />
+                          <Route
+                            path="dashboard"
+                            element={<Dashboard activeMonth={activeMonth} />}
+                          />
+                          <Route
+                            path="clients"
+                            element={<ClientsPage activeMonth={activeMonth} />}
+                          />
+                          <Route
+                            path="closed"
+                            element={<ClosedClientsPage />}
+                          />
+                          <Route
+                            path="excel"
+                            element={
+                              <ExcelPage
+                                activeMonth={activeMonth}
+                                onDataChanged={loadMonths}
+                              />
+                            }
+                          />
+                          <Route
+                            path="settings"
+                            element={<SettingsPage />}
+                          />
+                          <Route path="*" element={<Navigate to="/collection" replace />} />
+                        </Routes>
+                      </ErrorBoundary>
+                    </Layout>
+                  }
+                />
+              </Routes>
+            </BrowserRouter>
+          </ShopProvider>
         </LanguageProvider>
       </ThemeProvider>
     </ErrorBoundary>

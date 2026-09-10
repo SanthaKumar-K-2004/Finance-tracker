@@ -12,7 +12,7 @@
     "seed": "node server/seed.js",
     "sync": "node server/syncLocalDb.js",
     "mcp": "node server/mcpServer.js",
-    "test": "node test/phase0.test.js && node test/phase1.test.js && node test/phase2.test.js && node test/phase3.test.js && node test/phase4.test.js && node test/phase5.test.js && node test/core_features_integration.test.js && node test/features_treasure.test.js && node test/phase6_excel_architecture.test.js && node test/phase6.test.js && node --test test/dynamic_month_days.test.js && node --test test/performance_and_fixes.test.js && node --test test/click_edit_and_scale.test.js && node --test test/error_boundary_and_rollover_speed.test.js && node --test test/receipt_tenure_and_quick_add.test.js"
+    "test": "node test/phase0.test.js && node test/phase1.test.js && node test/phase2.test.js && node test/phase3.test.js && node test/phase4.test.js && node test/phase5.test.js && node test/core_features_integration.test.js && node test/features_treasure.test.js && node test/phase6_excel_architecture.test.js && node test/phase6.test.js && node --test test/dynamic_month_days.test.js && node --test test/performance_and_fixes.test.js && node --test test/click_edit_and_scale.test.js && node --test test/error_boundary_and_rollover_speed.test.js && node --test test/receipt_tenure_and_quick_add.test.js && node --test test/alphax_portal_and_shops.test.js"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",

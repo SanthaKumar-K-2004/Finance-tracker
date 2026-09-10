@@ -14,6 +14,7 @@ import rolloverRouter from './routes/rollover.js';
 import reportsRouter from './routes/reports.js';
 import excelRouter from './routes/excel.js';
 import backupRouter from './routes/backup.js';
+import shopsRouter from './routes/shops.js';
 
 import zlib from 'node:zlib';
 
@@ -89,6 +90,7 @@ app.use('/api/rollover', rolloverRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/excel', excelRouter);
 app.use('/api/backup', backupRouter);
+app.use('/api/shops', shopsRouter);
 
 // Serve static frontend assets from dist if built
 const distDir = path.resolve(__dirname, '../dist');
