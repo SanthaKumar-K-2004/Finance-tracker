@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "finance-db": {
+      "command": "node",
+      "args": [
+        "/home/santhakumar/Desktop/FINACE PROJECT/server/mcpServer.js"
+      ]
+    }
+  }
+}

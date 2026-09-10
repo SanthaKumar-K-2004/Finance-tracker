@@ -1,0 +1,36 @@
+{
+  "name": "daily-collection-finance-manager",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n \"SERVER,VITE\" -c \"blue,green\" \"node server/index.js\" \"vite\"",
+    "server": "node server/index.js",
+    "client": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "seed": "node server/seed.js",
+    "sync": "node server/syncLocalDb.js",
+    "mcp": "node server/mcpServer.js",
+    "test": "node test/phase0.test.js && node test/phase1.test.js && node test/phase2.test.js && node test/phase3.test.js && node test/phase4.test.js && node test/phase5.test.js && node test/core_features_integration.test.js && node test/features_treasure.test.js && node test/phase6_excel_architecture.test.js && node test/phase6.test.js && node --test test/dynamic_month_days.test.js && node --test test/performance_and_fixes.test.js && node --test test/click_edit_and_scale.test.js && node --test test/error_boundary_and_rollover_speed.test.js && node --test test/receipt_tenure_and_quick_add.test.js"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.18.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "lucide-react": "^1.16.0",
+    "multer": "^1.4.5-lts.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.5",
+    "recharts": "^2.15.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.2",
+    "vite": "^6.1.0"
+  }
+}

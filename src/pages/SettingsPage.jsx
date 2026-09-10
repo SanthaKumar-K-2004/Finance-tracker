@@ -1,0 +1,277 @@
+import React, { useState, useEffect } from 'react';
+import { useLanguage } from '../context/LanguageContext';
+import { useTheme } from '../context/ThemeContext';
+import { Settings, Database, Download, Upload, ShieldCheck, Moon, Sun, Clock, Languages, Store, CheckCircle, AlertCircle } from 'lucide-react';
+
+export default function SettingsPage() {
+  const { lang, setLang, t } = useLanguage();
+  const { themeMode, setThemeMode } = useTheme();
+  const [dbStatus, setDbStatus] = useState(null);
+  const [restoreMessage, setRestoreMessage] = useState(null);
+  const [restoring, setRestoring] = useState(false);
+
+  const loadStatus = () => {
+    fetch('/api/backup/status')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setDbStatus(data);
+        }
+      })
+      .catch(console.error);
+  };
+
+  useEffect(() => {
+    loadStatus();
+  }, []);
+
+  const handleDownloadBackup = () => {
+    window.location.href = '/api/backup/export';
+  };
+
+  const handleDownloadDbSnapshot = () => {
+    window.location.href = '/api/backup/download-db';
+  };
+
+  const handleRestoreFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm(lang === 'ta' ? 'இந்த காப்புப் பிரதியிலிருந்து தரவுகளை மீட்டமைக்கவா? ஏற்கனவே உள்ள தரவுகள் புதுப்பிக்கப்படும்.' : 'Restore database from this backup file? Existing records will be updated.')) {
+      e.target.value = '';
+      return;
+    }
+
+    setRestoring(true);
+    setRestoreMessage(null);
+
+    // If uploading binary .db SQLite file
+    if (file.name.endsWith('.db') || file.name.endsWith('.sqlite')) {
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const res = await fetch('/api/backup/restore-db', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+          setRestoreMessage({
+            type: 'success',
+            text: lang === 'ta'
+              ? 'பைனரி SQLite தரவுத்தளம் வெற்றிகரமாக மீட்டமைக்கப்பட்டது!'
+              : 'Binary SQLite database restored successfully!'
+          });
+          loadStatus();
+        } else {
+          setRestoreMessage({ type: 'error', text: data.error || 'Restore failed' });
+        }
+      } catch (err) {
+        setRestoreMessage({ type: 'error', text: err.message || 'Restore error' });
+      } finally {
+        setRestoring(false);
+        e.target.value = '';
+      }
+      return;
+    }
+
+    // Default: JSON backup file
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const backupJson = JSON.parse(event.target.result);
+        const res = await fetch('/api/backup/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(backupJson)
+        });
+        const data = await res.json();
+        if (data.success) {
+          setRestoreMessage({
+            type: 'success',
+            text: lang === 'ta'
+              ? `வெற்றிகரமாக மீட்டமைக்கப்பட்டது! (${data.restored?.clients || 0} வாடிக்கையாளர்கள், ${data.restored?.daily_collections || 0} வசூல் பதிவுகள்)`
+              : `Backup restored successfully! (${data.restored?.clients || 0} clients, ${data.restored?.daily_collections || 0} collections)`
+          });
+          loadStatus();
+        } else {
+          setRestoreMessage({ type: 'error', text: data.error || 'Restore failed' });
+        }
+      } catch (err) {
+        setRestoreMessage({ type: 'error', text: err.message || 'Invalid JSON file' });
+      } finally {
+        setRestoring(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '750px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <Settings size={24} color="var(--emerald-primary)" />
+        <h2 style={{ fontSize: '19px', fontWeight: 800 }}>
+          {lang === 'ta' ? 'அமைப்புகள் மற்றும் தரவு பாதுகாப்பு' : 'Settings & Data Protection'}
+        </h2>
+      </div>
+
+      {/* Shop Profile Information */}
+      <div className="card">
+        <h3 style={{ fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+          <Store size={18} color="var(--emerald-primary)" />
+          <span>{lang === 'ta' ? 'ஃபைனான்ஸ் நிறுவன விவரங்கள் (Shop Profile)' : 'Shop Profile Information'}</span>
+        </h3>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          <div>
+            <label className="form-label">{lang === 'ta' ? 'நிறுவனப் பெயர்' : 'Shop Name'}</label>
+            <input type="text" className="form-input" readOnly value="ALR Finance (ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ்)" />
+          </div>
+          <div>
+            <label className="form-label">{lang === 'ta' ? 'தொடர்பு எண்' : 'Phone'}</label>
+            <input type="text" className="form-input font-mono" readOnly value="9585194934" />
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label className="form-label">{lang === 'ta' ? 'முகவரி' : 'Address'}</label>
+            <input type="text" className="form-input" readOnly value="அலங்காநல்லூர், மதுரை (Alanganallur, Madurai)" />
+          </div>
+        </div>
+      </div>
+
+      {/* Database & Cloud Backup */}
+      <div className="card">
+        <h3 style={{ fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+          <Database size={18} color="var(--indigo-primary)" />
+          <span>{lang === 'ta' ? 'கிளவுட் தரவுத்தளம் & காப்புப் பிரதி (Backup)' : 'Cloud Database & Instant Backup'}</span>
+        </h3>
+
+        {dbStatus && (
+          <div style={{ background: 'var(--bg-surface-hover)', padding: '14px', borderRadius: 'var(--radius-md)', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600 }}>{lang === 'ta' ? 'இணைப்பு நிலை' : 'Connection Status'}:</span>
+              <span className="badge badge-emerald">
+                <ShieldCheck size={14} />
+                <span>Turso Cloud SQLite (AWS Mumbai Active)</span>
+              </span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '10px', textAlign: 'center' }}>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{lang === 'ta' ? 'வாடிக்கையாளர்கள்' : 'Clients'}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>{dbStatus.stats.total_clients}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{lang === 'ta' ? 'வசூல் பதிவுகள்' : 'Collections'}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>{dbStatus.stats.total_collections}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{lang === 'ta' ? 'மாதத் தவணைகள்' : 'Cycles'}</div>
+                <div style={{ fontSize: '18px', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>{dbStatus.stats.total_cycles}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: 1.5 }}>
+          {lang === 'ta'
+            ? 'உங்கள் அனைத்து வாடிக்கையாளர் கணக்குகளையும், தவணை வரலாற்றையும் ஒரே கிளிக்கில் முழுமையான JSON/SQLite காப்புப் பிரதியாக கணினியில் பதிவிறக்கிக் கொள்ளலாம்.'
+            : 'Download a complete snapshot of all database tables and collection history to your laptop or Google Drive with zero dependency on external servers.'}
+        </p>
+
+        {restoreMessage && (
+          <div
+            style={{
+              padding: '12px 14px',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: '14px',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: restoreMessage.type === 'success' ? 'var(--emerald-light)' : 'var(--rose-light)',
+              color: restoreMessage.type === 'success' ? 'var(--emerald-text)' : 'var(--rose-text)'
+            }}
+          >
+            {restoreMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+            <span>{restoreMessage.text}</span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={handleDownloadDbSnapshot}
+            className="btn btn-emerald"
+            style={{ height: '42px', flex: 1, minWidth: '200px' }}
+          >
+            <Database size={16} />
+            <span>{lang === 'ta' ? 'finance.db பதிவிறக்கம் (SQLite)' : 'Download finance.db Snapshot'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadBackup}
+            className="btn btn-secondary"
+            style={{ height: '42px', flex: 1, minWidth: '180px' }}
+          >
+            <Download size={16} />
+            <span>{lang === 'ta' ? 'JSON காப்புப் பிரதி' : 'Download Backup JSON'}</span>
+          </button>
+
+          <label
+            className={`btn btn-primary ${restoring ? 'btn-disabled' : ''}`}
+            style={{ height: '42px', flex: 1, minWidth: '180px', cursor: restoring ? 'not-allowed' : 'pointer', margin: 0 }}
+          >
+            <Upload size={16} />
+            <span>{restoring ? (lang === 'ta' ? 'மீட்டமைக்கிறது...' : 'Restoring...') : (lang === 'ta' ? 'கோப்பிலிருந்து மீட்டமை' : 'Restore (.json / .db)')}</span>
+            <input
+              type="file"
+              accept=".json,.db,.sqlite"
+              style={{ display: 'none' }}
+              disabled={restoring}
+              onChange={handleRestoreFile}
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* Theme & Language Preferences */}
+      <div className="card">
+        <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>
+          {lang === 'ta' ? 'விருப்பத் தேர்வுகள் (Preferences)' : 'User Preferences'}
+        </h3>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <div>
+            <label className="form-label">{lang === 'ta' ? 'பயன்பாட்டு மொழி (Language)' : 'Default Language'}</label>
+            <select
+              className="form-select"
+              value={lang}
+              onChange={e => {
+                setLang(e.target.value);
+                localStorage.setItem('alr_lang', e.target.value);
+              }}
+            >
+              <option value="ta">தமிழ் (Tamil)</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">{t('theme_title')}</label>
+            <select
+              className="form-select"
+              value={themeMode}
+              onChange={e => setThemeMode(e.target.value)}
+            >
+              <option value="auto">{t('theme_auto')}</option>
+              <option value="light">{t('theme_light')}</option>
+              <option value="sunlight">{t('theme_sunlight')}</option>
+              <option value="dark">{t('theme_dark')}</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
