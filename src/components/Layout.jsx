@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
-import { useShop } from '../context/ShopContext';
+import { useCompany } from '../context/CompanyContext';
 import {
   Table,
   CreditCard,
@@ -22,22 +22,18 @@ import {
   ChevronLeft,
   ChevronRight,
   Wifi,
-  WifiOff,
-  Building2,
-  Sparkles
+  WifiOff
 } from 'lucide-react';
 import CashDenominationModal from './CashDenominationModal';
 import MonthYearPicker from './MonthYearPicker';
-import ShopLoginModal from './ShopLoginModal';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 export default function Layout({ children, viewMode, setViewMode, activeMonth, setActiveMonth, monthsList, refreshData }) {
   const { lang, toggleLanguage, t } = useLanguage();
   const { themeMode, activeTheme, cycleTheme, uiScale, increaseUiScale, decreaseUiScale } = useTheme();
-  const { activeShop, openShopModal, isShopModalOpen, closeShopModal } = useShop();
+  const { company } = useCompany();
   const [showCashCounter, setShowCashCounter] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
   const { isOnline, pendingCount, isSyncing, triggerSync } = useNetworkStatus(refreshData);
 
   return (
@@ -45,54 +41,21 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
       {/* Top Application Header */}
       <header className="top-header">
         <div className="brand-section">
-          <div
-            className="brand-logo"
-            onClick={() => navigate('/portal')}
-            style={{ cursor: 'pointer' }}
-            title="AlphaX Solution Portal"
-          >
-            ALR
+          <div className="brand-logo">
+            {company?.name ? (company.name.split(' ')[0] || 'ALR').substring(0, 4).toUpperCase() : 'ALR'}
           </div>
           <div>
             <h1 className="brand-title">
-              {activeShop?.name || (lang === 'ta' ? 'ALR ஃபைனான்ஸ்' : 'ALR Finance')}
+              {company?.name || (lang === 'ta' ? 'ALR ஃபைனான்ஸ்' : 'ALR Finance')}
             </h1>
             <p className="brand-tagline">
-              {activeShop?.address ? `${activeShop.address} • ${activeShop.code || 'ALR'}` : (lang === 'ta' ? 'ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ் • அலங்காநல்லூர்' : 'Sri Lakshmi Finance • Alanganallur')}
+              {company?.tagline || (lang === 'ta' ? 'ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ் • அலங்காநல்லூர்' : 'Sri Lakshmi Finance • Alanganallur')}
             </p>
           </div>
         </div>
 
         {/* Top Controls & Badges */}
         <div className="top-controls">
-          {/* Active Branch / Shop Switcher Button */}
-          <button
-            type="button"
-            onClick={openShopModal}
-            className="btn btn-secondary btn-sm"
-            style={{
-              height: '36px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '0 10px',
-              border: '1px solid var(--border-strong)',
-              background: 'var(--bg-surface)'
-            }}
-            title={lang === 'ta' ? 'கிளை மாற்ற / உள்நுழைய' : 'Switch Branch / Shop Login'}
-          >
-            <Building2 size={15} color="#0071E3" />
-            <span style={{ fontWeight: 700, fontSize: '11.5px', maxWidth: '130px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {activeShop?.name || 'ALR Finance'}
-            </span>
-            <span
-              className="badge badge-primary font-mono"
-              style={{ fontSize: '9.5px', padding: '1px 5px', borderRadius: '4px' }}
-            >
-              {activeShop?.code || 'SHOP-ALR-01'}
-            </span>
-          </button>
-
           {/* Dedicated Enterprise Month/Year Picker & Navigator */}
           <MonthYearPicker
             activeMonth={activeMonth}
@@ -241,18 +204,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
       {/* Main Navigation Bar */}
       <nav className="nav-bar">
         <div className="nav-links">
-          {/* AlphaX Flagship Portal NavLink */}
-          <NavLink
-            to="/portal"
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            title="Return to AlphaX Solution Flagship Portal"
-          >
-            <Sparkles size={16} color="#38bdf8" />
-            <span style={{ color: '#38bdf8', fontWeight: 700 }}>AlphaX Portal</span>
-          </NavLink>
-
-          <NavLink to="/collection" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/" end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
             <Table size={17} />
             <span>{t('nav_collection')}</span>
           </NavLink>
@@ -301,15 +253,6 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
       {showCashCounter && (
         <CashDenominationModal onClose={() => setShowCashCounter(false)} />
       )}
-
-      {/* AlphaX Shop Gateway & Switcher Modal */}
-      <ShopLoginModal
-        isOpen={isShopModalOpen}
-        onClose={closeShopModal}
-        onAuthenticated={() => {
-          if (refreshData) refreshData();
-        }}
-      />
     </div>
   );
 }

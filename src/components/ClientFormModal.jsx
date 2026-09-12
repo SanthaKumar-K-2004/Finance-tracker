@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { X, UserPlus, Save, AlertCircle, AlertTriangle, Trash2, Calculator } from 'lucide-react';
+import { X, UserPlus, Save, AlertCircle, AlertTriangle, Trash2, Banknote } from 'lucide-react';
 
 export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onClose, onDeleteClient }) {
   const { lang, t } = useLanguage();
@@ -19,11 +19,6 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
     const [y, m] = monthYear.split('-').map(Number);
     return (y && m) ? new Date(y, m, 0).getDate() : 31;
   }, [monthYear]);
-
-  const [dailyAmount, setDailyAmount] = useState(() => {
-    const p = clientToEdit?.principal || 10000;
-    return Math.ceil(p / totalDays);
-  });
 
   useEffect(() => {
     fetch('/api/clients')
@@ -51,17 +46,8 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
     });
   }, [existingClients, cleanPhoneInput, name, clientToEdit]);
 
-  // Two-way Principal / Daily synchronizer
   const handlePrincipalChange = (val) => {
     setPrincipal(val);
-    const num = parseFloat(val) || 0;
-    setDailyAmount(Math.ceil(num / totalDays));
-  };
-
-  const handleDailyChange = (val) => {
-    setDailyAmount(val);
-    const num = parseFloat(val) || 0;
-    setPrincipal(Math.round(num * totalDays));
   };
 
   const handleSubmit = async (e) => {
@@ -232,67 +218,43 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
               </div>
             </div>
 
-            {/* Principal & Daily Calculation Card */}
+            {/* Principal Loan Amount Card */}
             <div style={{ background: 'var(--bg-app)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-md)', padding: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Calculator size={15} color="var(--emerald-primary)" />
-                  <span>{lang === 'ta' ? 'அசல் கடன் & தவணை தொகை' : 'Principal & Daily Amount'}</span>
+                <span style={{ fontSize: '13.5px', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Banknote size={17} color="var(--emerald-primary)" />
+                  <span>{lang === 'ta' ? 'அசல் கடன் தொகை' : 'Principal Loan Amount'}</span>
                 </span>
                 <span className="badge badge-indigo font-mono" style={{ fontSize: '11px' }}>
                   {totalDays} {lang === 'ta' ? 'நாட்கள்' : 'Days'}
                 </span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                {/* Principal Amount Field */}
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>
-                    {lang === 'ta' ? 'அசல் கடன் தொகை (₹) *' : 'Principal (₹) *'}
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: '10px', top: '10px', fontSize: '16px', fontWeight: 800, color: 'var(--text-muted)' }}>
-                      ₹
-                    </span>
-                    <input
-                      type="number"
-                      required
-                      min="500"
-                      step="100"
-                      className="form-input font-mono"
-                      style={{ paddingLeft: '28px', height: '42px', fontSize: '16px', fontWeight: 800 }}
-                      value={principal}
-                      onChange={e => handlePrincipalChange(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                {/* Expected Daily Installment Field */}
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 700 }}>
-                    {lang === 'ta' ? 'தினசரி தவணை (₹/நாள்)' : 'Daily Installment (₹/day)'}
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <span style={{ position: 'absolute', left: '10px', top: '10px', fontSize: '16px', fontWeight: 800, color: 'var(--indigo-primary)' }}>
-                      ₹
-                    </span>
-                    <input
-                      type="number"
-                      required
-                      min="10"
-                      step="10"
-                      className="form-input font-mono"
-                      style={{ paddingLeft: '28px', height: '42px', fontSize: '16px', fontWeight: 800, color: 'var(--indigo-primary)' }}
-                      value={dailyAmount}
-                      onChange={e => handleDailyChange(e.target.value)}
-                    />
-                  </div>
+              {/* Principal Amount Field */}
+              <div className="form-group" style={{ marginBottom: '10px' }}>
+                <label className="form-label" style={{ fontWeight: 700 }}>
+                  {lang === 'ta' ? 'அசல் கடன் தொகை (₹) *' : 'Principal Amount (₹) *'}
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '16px', fontWeight: 800, color: 'var(--emerald-primary)' }}>
+                    ₹
+                  </span>
+                  <input
+                    type="number"
+                    required
+                    min="500"
+                    step="100"
+                    className="form-input font-mono"
+                    style={{ paddingLeft: '32px', height: '44px', fontSize: '16px', fontWeight: 800 }}
+                    value={principal}
+                    onChange={e => handlePrincipalChange(e.target.value)}
+                  />
                 </div>
               </div>
 
               {/* Quick Preset Buttons for Principal */}
-              <div style={{ marginTop: '10px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '5px' }}>
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>
                   {lang === 'ta' ? 'விரைவு அசல் தேர்வுகள் (Quick Principal):' : 'Quick Principal:'}
                 </div>
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -303,42 +265,15 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
                       onClick={() => handlePrincipalChange(amt)}
                       className="chip-btn"
                       style={{
-                        height: '30px',
-                        fontSize: '11.5px',
+                        height: '32px',
+                        fontSize: '12px',
                         fontWeight: 750,
-                        borderColor: principal === amt ? 'var(--emerald-primary)' : undefined,
-                        background: principal === amt ? 'var(--emerald-light)' : undefined,
-                        color: principal === amt ? 'var(--emerald-text)' : undefined
+                        borderColor: Number(principal) === amt ? 'var(--emerald-primary)' : undefined,
+                        background: Number(principal) === amt ? 'var(--emerald-light)' : undefined,
+                        color: Number(principal) === amt ? 'var(--emerald-text)' : undefined
                       }}
                     >
                       ₹{amt.toLocaleString('en-IN')}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Quick Preset Buttons for Daily Amount */}
-              <div style={{ marginTop: '8px' }}>
-                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '5px' }}>
-                  {lang === 'ta' ? 'விரைவு தினசரி தவணை (Quick Daily):' : 'Quick Daily Due:'}
-                </div>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {[100, 200, 300, 400, 500].map(amt => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => handleDailyChange(amt)}
-                      className="chip-btn"
-                      style={{
-                        height: '30px',
-                        fontSize: '11.5px',
-                        fontWeight: 750,
-                        borderColor: dailyAmount === amt ? 'var(--indigo-primary)' : undefined,
-                        background: dailyAmount === amt ? 'var(--indigo-light)' : undefined,
-                        color: dailyAmount === amt ? 'var(--indigo-text)' : undefined
-                      }}
-                    >
-                      ₹{amt}/நாள்
                     </button>
                   ))}
                 </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getOfflineQueue, syncOfflineQueue } from '../utils/offlineSync';
 
 export function useNetworkStatus(onSynced) {
@@ -6,29 +6,45 @@ export function useNetworkStatus(onSynced) {
   const [pendingCount, setPendingCount] = useState(() => getOfflineQueue().length);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Keep a stable ref for caller callback to prevent unneeded hook re-subscriptions
+  const onSyncedRef = useRef(onSynced);
+  useEffect(() => {
+    onSyncedRef.current = onSynced;
+  }, [onSynced]);
+
+  const isSyncingRef = useRef(false);
+
   const refreshPendingCount = useCallback(() => {
     setPendingCount(getOfflineQueue().length);
   }, []);
 
   const triggerSync = useCallback(async () => {
-    if (!navigator.onLine || isSyncing) return;
+    if (typeof navigator === 'undefined' || !navigator.onLine || isSyncingRef.current) return;
     const queue = getOfflineQueue();
     if (queue.length === 0) return;
 
+    isSyncingRef.current = true;
     setIsSyncing(true);
     try {
       const result = await syncOfflineQueue();
       if (result.success && result.count > 0) {
         refreshPendingCount();
-        if (onSynced) onSynced(result.count);
+        if (onSyncedRef.current) {
+          onSyncedRef.current(result.count);
+        }
       }
+    } catch (err) {
+      console.warn('Sync offline queue warning:', err);
     } finally {
+      isSyncingRef.current = false;
       setIsSyncing(false);
       refreshPendingCount();
     }
-  }, [isSyncing, onSynced, refreshPendingCount]);
+  }, [refreshPendingCount]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const handleOnline = () => {
       setIsOnline(true);
       triggerSync();

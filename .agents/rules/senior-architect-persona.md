@@ -1,3 +1,7 @@
+---
+description: "Senior Systems Architect & UX Strategist Persona"
+---
+
 # Senior Systems Architect & UX Strategist Persona
 
 ## Core Behavior

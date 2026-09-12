@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import ClientFormModal from '../components/ClientFormModal';
 import ReceiptModal from '../components/ReceiptModal';
-import { Users, Search, Plus, Phone, MapPin, Edit, Trash2, FileText, MessageSquare } from 'lucide-react';
+import { Users, Search, Plus, Phone, MapPin, Edit, Trash2, FileText, MessageSquare, RotateCcw } from 'lucide-react';
 
 export default function ClientsPage({ activeMonth }) {
   const { lang, t } = useLanguage();
@@ -41,6 +41,36 @@ export default function ClientsPage({ activeMonth }) {
       const data = await res.json();
       if (data.success) {
         loadClients();
+      }
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleReset = async (client) => {
+    if (!client.active_cycle_id) {
+      alert(lang === 'ta' ? 'இந்த வாடிக்கையாளருக்கு தற்போதைய மாதத்தில் நேரடி வசூல் கடன் இல்லை.' : 'No active cycle found for this borrower.');
+      return;
+    }
+    const confirmMsg = lang === 'ta'
+      ? `${client.name} அவர்களின் நடப்பு மாத வசூல் தொகையை ₹0 என மீட்டமைக்கவா?`
+      : `Reset collections to ₹0 for ${client.name}?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch('/api/collections/reset-client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cycle_id: client.active_cycle_id,
+          client_id: client.id
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        loadClients();
+      } else {
+        alert(data.error || 'Failed to reset client collections');
       }
     } catch (err) {
       alert(err.message);
@@ -137,8 +167,14 @@ export default function ClientsPage({ activeMonth }) {
                       onClick={() => { setClientToEdit(c); setShowAddModal(true); }}
                       title={lang === 'ta' ? 'வாடிக்கையாளர் திருத்த கிளிக் செய்க' : 'Click to edit borrower'}
                     >
+                      {c.address && (
+                        <div className="grid-client-address-above" title={c.address} style={{ marginBottom: '4px' }}>
+                          <MapPin size={11} style={{ flexShrink: 0 }} />
+                          <span>{c.address}</span>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                        <span style={{ fontWeight: 800, fontSize: '15.5px' }}>{c.name}</span>
+                        <span style={{ fontWeight: 800, fontSize: '16px' }}>{c.name}</span>
                         <Edit size={13} color="var(--indigo-primary)" style={{ opacity: 0.7 }} />
                       </div>
                     </td>
@@ -187,6 +223,7 @@ export default function ClientsPage({ activeMonth }) {
                         >
                           <FileText size={14} />
                         </button>
+
                         {/* WhatsApp Receipt */}
                         {c.phone && (
                           <button
@@ -202,6 +239,8 @@ export default function ClientsPage({ activeMonth }) {
                             <MessageSquare size={14} />
                           </button>
                         )}
+
+                        {/* Edit Borrower */}
                         <button
                           type="button"
                           onClick={() => {
@@ -214,6 +253,21 @@ export default function ClientsPage({ activeMonth }) {
                         >
                           <Edit size={14} />
                         </button>
+
+                        {/* Reset Collections */}
+                        {c.active_cycle_id && (
+                          <button
+                            type="button"
+                            onClick={() => handleReset(c)}
+                            className="btn-icon"
+                            style={{ padding: '4px', color: 'var(--amber-primary)' }}
+                            title={lang === 'ta' ? 'வசூல் மீட்டமை' : 'Reset Collections'}
+                          >
+                            <RotateCcw size={14} />
+                          </button>
+                        )}
+
+                        {/* Delete Borrower */}
                         <button
                           type="button"
                           onClick={() => handleDelete(c.id, c.name)}

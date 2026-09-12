@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { useCompany } from '../context/CompanyContext';
 import { 
   X, 
   MessageSquare, 
@@ -29,11 +30,12 @@ export default function ReceiptModal({ client, totalDays: propTotalDays, mode = 
   const [receiptFormat, setReceiptFormat] = useState('concise'); // 'concise' | 'detailed'
   const [rollSize, setRollSize] = useState('80mm'); // '80mm' | '58mm'
 
+  const { company } = useCompany();
   const totalDays = propTotalDays || client.total_days || 31;
   const today = new Date().toLocaleDateString('en-GB');
-  const shopName = receiptLang === 'ta' ? 'ALR ஃபைனான்ஸ்' : 'ALR Finance';
-  const shopPhone = '9585194934';
-  const shopAddress = receiptLang === 'ta' ? 'அலங்காநல்லூர், மதுரை' : 'Alanganallur, Madurai';
+  const shopName = company?.name || (receiptLang === 'ta' ? 'ALR ஃபைனான்ஸ்' : 'ALR Finance');
+  const shopPhone = company?.phone || '9585194934';
+  const shopAddress = company?.address || (receiptLang === 'ta' ? 'அலங்காநல்லூர், மதுரை' : 'Alanganallur, Madurai');
 
   const principal = Number(client.principal || 10000);
   const expectedDaily = Math.round(principal / totalDays);

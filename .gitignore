@@ -14,10 +14,12 @@ build/
 .env.*.local
 
 # Local SQLite databases and temp files
-data/*.db
-data/*.db-journal
-data/*.db-wal
-data/*.db-shm
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.db-info
 
 # Temporary scratch and logs
 scratch/

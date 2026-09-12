@@ -8,18 +8,22 @@ const router = Router();
 // GET all clients
 router.get('/', async (req, res) => {
   try {
-    const clients = await query(
-      `SELECT c.*, 
-              lc.id as active_cycle_id,
-              lc.principal,
-              lc.month_year,
-              COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id), 0) as total_collected
-       FROM clients c
-       LEFT JOIN loan_cycles lc ON lc.client_id = c.id AND lc.status = 'active'
-       WHERE c.status != 'deleted'
-       ORDER BY c.sl_no ASC`
-    );
-    res.json({ success: true, data: clients });
+    const payload = await serverCache.getOrFetch('clients_list', async () => {
+      const clients = await query(
+        `SELECT c.*, 
+                lc.id as active_cycle_id,
+                lc.principal,
+                lc.month_year,
+                COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id), 0) as total_collected
+         FROM clients c
+         LEFT JOIN loan_cycles lc ON lc.client_id = c.id AND lc.status = 'active'
+         WHERE c.status != 'deleted'
+         ORDER BY c.sl_no ASC`
+      );
+      return { success: true, data: clients };
+    }, 5 * 60 * 1000, ['clients']);
+
+    res.json(payload);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -160,10 +164,11 @@ router.post('/', async (req, res) => {
       ]
     );
 
-    // Invalidate grid, months list, and report caches
+    // Invalidate grid, months list, client list, and report caches
     serverCache.invalidateTag('grid');
     serverCache.invalidateTag('months');
     serverCache.invalidateTag('reports');
+    serverCache.invalidateTag('clients');
 
     res.status(201).json({
       success: true,
@@ -212,6 +217,7 @@ router.put('/:id', async (req, res) => {
     serverCache.invalidateTag('grid');
     serverCache.invalidateTag('months');
     serverCache.invalidateTag('reports');
+    serverCache.invalidateTag('clients');
 
     res.json({ success: true, message: 'Client updated successfully' });
   } catch (err) {
@@ -228,6 +234,7 @@ router.delete('/:id', async (req, res) => {
     serverCache.invalidateTag('grid');
     serverCache.invalidateTag('months');
     serverCache.invalidateTag('reports');
+    serverCache.invalidateTag('clients');
     res.json({ success: true, message: 'Client deleted' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

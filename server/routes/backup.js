@@ -68,11 +68,26 @@ router.get('/export', async (req, res) => {
 router.post('/restore', async (req, res) => {
   try {
     const backup = req.body;
-    if (!backup || !backup.tables) {
-      return res.status(400).json({ success: false, error: 'Invalid backup format: tables missing' });
+    if (!backup || typeof backup !== 'object' || !backup.tables || typeof backup.tables !== 'object') {
+      return res.status(400).json({ success: false, error: 'Invalid backup format: tables missing or malformed' });
     }
 
-    const { companies = [], clients = [], loan_cycles = [], daily_collections = [], closed_clients = [], settings = [], settlements = [], whatsapp_logs = [] } = backup.tables;
+    const {
+      companies = [],
+      clients = [],
+      loan_cycles = [],
+      daily_collections = [],
+      closed_clients = [],
+      settings = [],
+      settlements = [],
+      whatsapp_logs = []
+    } = backup.tables;
+
+    if (!Array.isArray(companies) || !Array.isArray(clients) || !Array.isArray(loan_cycles) ||
+        !Array.isArray(daily_collections) || !Array.isArray(closed_clients) || !Array.isArray(settings) ||
+        !Array.isArray(settlements) || !Array.isArray(whatsapp_logs)) {
+      return res.status(400).json({ success: false, error: 'Invalid backup format: table collections must be arrays' });
+    }
 
     const allStatements = [];
 

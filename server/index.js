@@ -14,9 +14,10 @@ import rolloverRouter from './routes/rollover.js';
 import reportsRouter from './routes/reports.js';
 import excelRouter from './routes/excel.js';
 import backupRouter from './routes/backup.js';
-import shopsRouter from './routes/shops.js';
+import companyRouter from './routes/company.js';
 
 import zlib from 'node:zlib';
+import { securityHeaders, corsOriginCheck, createRateLimiter } from './middleware/security.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -51,12 +52,32 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middleware
+// Security Hardening: Anti-sniff, clickjacking prevention, strict referrer & permissions policies
+app.use(securityHeaders);
+
+// Restrictive CORS Validator
 app.use(cors({
-  origin: '*',
+  origin: corsOriginCheck,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// In-Memory sliding-window rate limiters
+const apiLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 600,
+  message: 'Too many requests to the Finance API. Please wait a moment.'
+});
+const sensitiveLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 40,
+  message: 'Sensitive database operation limit exceeded. Please wait 1 minute before retrying.'
+});
+
+app.use('/api', apiLimiter);
+app.use('/api/backup/restore', sensitiveLimiter);
+app.use('/api/backup/restore-db', sensitiveLimiter);
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -90,7 +111,7 @@ app.use('/api/rollover', rolloverRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/excel', excelRouter);
 app.use('/api/backup', backupRouter);
-app.use('/api/shops', shopsRouter);
+app.use('/api/company', companyRouter);
 
 // Serve static frontend assets from dist if built
 const distDir = path.resolve(__dirname, '../dist');

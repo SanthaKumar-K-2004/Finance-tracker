@@ -12,11 +12,13 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const isTurso = process.env.DATABASE_MODE === 'turso' && process.env.TURSO_DATABASE_URL;
 
-// Ensure data directory exists for local DB fallback
+// Ensure data directory exists for local DB and embedded replica
 const dataDir = path.resolve(__dirname, '../data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
+
+const replicaDbPath = path.resolve(dataDir, 'finance_replica.db');
 
 const clientConfig = isTurso
   ? {
@@ -27,38 +29,112 @@ const clientConfig = isTurso
       url: `file:${path.resolve(dataDir, 'finance.db')}`
     };
 
-console.log(`🔌 Database Mode: ${isTurso ? 'Turso Cloud SQLite' : 'Local SQLite'}`);
+console.log(`🔌 Database Mode: ${isTurso ? 'Turso Cloud (Managed distributed DB with SWR In-Memory Engine)' : 'Local SQLite'}`);
 if (isTurso) {
-  console.log(`🌐 Turso URL: ${process.env.TURSO_DATABASE_URL}`);
+  console.log(`🌐 Turso Primary: ${process.env.TURSO_DATABASE_URL}`);
 } else {
   console.log(`📁 Local DB: ${clientConfig.url}`);
 }
 
 export const db = createClient(clientConfig);
 
-// Helper for running SQL with params
+const DB_TIMEOUT_MS = 6500;
+
+function withTimeout(promise, ms = DB_TIMEOUT_MS) {
+  let timer;
+  const timeoutPromise = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Database operation timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timer));
+}
+
+// Helper for running SQL with params with automatic retry and object mapping
 export async function query(sql, args = []) {
   const safeArgs = Array.isArray(args) ? args.map(a => a === undefined ? null : a) : args;
-  const result = await db.execute({ sql, args: safeArgs });
-  // Map rows to clean JavaScript objects
-  const { columns, rows } = result;
-  if (!columns || !rows) return [];
-  return rows.map(row => {
-    const obj = {};
-    columns.forEach((col, idx) => {
-      obj[col] = row[idx];
-    });
-    return obj;
-  });
+  let lastErr = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const result = await withTimeout(db.execute({ sql, args: safeArgs }));
+      const { columns, rows } = result;
+      if (!columns || !rows) return [];
+      return rows.map(row => {
+        const obj = {};
+        columns.forEach((col, idx) => {
+          obj[col] = row[idx];
+        });
+        return obj;
+      });
+    } catch (err) {
+      lastErr = err;
+      const isTransient = err.message && (
+        err.message.includes('fetch failed') ||
+        err.message.includes('timed out') ||
+        err.message.includes('timeout') ||
+        err.message.includes('ECONNRESET') ||
+        err.message.includes('500') ||
+        err.message.includes('503') ||
+        err.message.includes('busy')
+      );
+      if (isTransient && attempt < 3) {
+        await new Promise(r => setTimeout(r, attempt * 150));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 export async function execute(sql, args = []) {
   const safeArgs = Array.isArray(args) ? args.map(a => a === undefined ? null : a) : args;
-  return await db.execute({ sql, args: safeArgs });
+  let lastErr = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await withTimeout(db.execute({ sql, args: safeArgs }));
+    } catch (err) {
+      lastErr = err;
+      const isTransient = err.message && (
+        err.message.includes('fetch failed') ||
+        err.message.includes('timed out') ||
+        err.message.includes('timeout') ||
+        err.message.includes('ECONNRESET') ||
+        err.message.includes('500') ||
+        err.message.includes('503') ||
+        err.message.includes('busy')
+      );
+      if (isTransient && attempt < 3) {
+        await new Promise(r => setTimeout(r, attempt * 150));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 export async function batch(statements) {
-  return await db.batch(statements);
+  let lastErr = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await withTimeout(db.batch(statements), 10000);
+    } catch (err) {
+      lastErr = err;
+      const isTransient = err.message && (
+        err.message.includes('fetch failed') ||
+        err.message.includes('timeout') ||
+        err.message.includes('ECONNRESET') ||
+        err.message.includes('500') ||
+        err.message.includes('503') ||
+        err.message.includes('busy')
+      );
+      if (isTransient && attempt < 3) {
+        await new Promise(r => setTimeout(r, attempt * 200));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
 }
 
 // Database Schema DDL

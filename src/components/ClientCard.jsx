@@ -27,7 +27,8 @@ export default function ClientCard({
   onOpenReceipt,
   onCloseClient,
   onEditClient,
-  onDeleteClient
+  onDeleteClient,
+  onResetClient
 }) {
   const { lang, t } = useLanguage();
   const [isUnlocked, setIsUnlocked] = useState(false);
@@ -61,7 +62,7 @@ export default function ClientCard({
 
   return (
     <div className={`mobile-client-card ${isCleared ? 'card-cleared' : ''}`}>
-      {/* Header: Name, Sl.No, Phone, Village - Click to Edit */}
+      {/* Header: Address Above, Name, Sl.No, Phone - Click to Edit */}
       <div className="card-header-row">
         <div
           className="clickable-edit-header"
@@ -69,6 +70,14 @@ export default function ClientCard({
           title={lang === 'ta' ? 'வாடிக்கையாளர் விவரங்கள் திருத்த கிளிக் செய்க' : 'Click to edit borrower details'}
           style={{ flex: 1 }}
         >
+          {/* Prominent Address Pill Displayed Above Name */}
+          {client.address && (
+            <div className="client-address-badge-above" title={client.address}>
+              <MapPin size={12} style={{ flexShrink: 0 }} />
+              <span>{client.address}</span>
+            </div>
+          )}
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span className="sl-no-badge font-mono">
               #{client.sl_no}
@@ -78,8 +87,8 @@ export default function ClientCard({
               <Edit size={14} color="var(--indigo-primary)" style={{ opacity: 0.7 }} />
             </h3>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px' }}>
-            {client.phone && (
+          {client.phone && (
+            <div style={{ marginTop: '4px' }}>
               <a
                 href={`tel:${client.phone}`}
                 onClick={(e) => e.stopPropagation()}
@@ -89,14 +98,8 @@ export default function ClientCard({
                 <Phone size={13} />
                 <span className="font-mono">{client.phone}</span>
               </a>
-            )}
-            {client.address && (
-              <span className="client-phone-sub" style={{ fontWeight: 600 }}>
-                <MapPin size={13} />
-                <span>{client.address}</span>
-              </span>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Cleared badge or today's payment status */}
@@ -366,7 +369,17 @@ export default function ClientCard({
 
         <button
           type="button"
-          onClick={() => onDeleteClient && onDeleteClient(client.client_id, client.name)}
+          onClick={() => onResetClient && onResetClient(client)}
+          className="btn btn-secondary btn-sm"
+          style={{ height: '36px', padding: '0 10px', color: 'var(--amber-primary)', borderColor: 'var(--amber-border)' }}
+          title={lang === 'ta' ? 'வசூல் மீட்டமை (0 ஆக்குக)' : 'Reset Collections to ₹0'}
+        >
+          <RotateCcw size={15} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onDeleteClient && onDeleteClient(client.client_id, client.name, client.cycle_id)}
           className="btn btn-secondary btn-sm"
           style={{ height: '36px', padding: '0 10px', color: 'var(--rose-primary)' }}
           title={lang === 'ta' ? 'நீக்குக' : 'Delete Borrower'}

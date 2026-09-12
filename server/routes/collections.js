@@ -11,130 +11,132 @@ router.get(['/', '/grid'], async (req, res) => {
     const month_year = req.query.month_year || '2026-05';
     const cacheKey = `grid_${month_year}`;
 
-    // Return instant pre-computed cached ledger if available (< 1ms response)
-    const cached = serverCache.get(cacheKey);
-    if (cached) {
-      return res.json(cached);
-    }
+    const payload = await serverCache.getOrFetch(cacheKey, async () => {
+      const companyId = 'comp_alr_001';
 
-    const companyId = 'comp_alr_001';
+      // 1 & 2. Fetch active cycles and collections for this month in parallel
+      const [cycles, collections] = await Promise.all([
+        query(
+          `SELECT lc.id as cycle_id,
+                  lc.month_year,
+                  lc.cycle_name,
+                  lc.principal,
+                  lc.status as cycle_status,
+                  c.id as client_id,
+                  c.sl_no,
+                  c.client_code,
+                  c.name,
+                  c.phone,
+                  c.address
+           FROM loan_cycles lc
+           JOIN clients c ON c.id = lc.client_id
+           WHERE lc.company_id = ? AND lc.month_year = ? AND c.status != 'deleted' AND lc.status != 'archived'
+           ORDER BY c.sl_no ASC`,
+          [companyId, month_year]
+        ),
+        query(
+          `SELECT dc.cycle_id,
+                  dc.client_id,
+                  dc.day_number,
+                  dc.amount,
+                  dc.payment_mode,
+                  dc.collected_by,
+                  dc.collection_date
+           FROM daily_collections dc
+           JOIN loan_cycles lc ON lc.id = dc.cycle_id
+           WHERE lc.company_id = ? AND lc.month_year = ?`,
+          [companyId, month_year]
+        )
+      ]);
 
-    // 1. Fetch active cycles and clients for this month
-    const cycles = await query(
-      `SELECT lc.id as cycle_id,
-              lc.month_year,
-              lc.cycle_name,
-              lc.principal,
-              lc.status as cycle_status,
-              c.id as client_id,
-              c.sl_no,
-              c.client_code,
-              c.name,
-              c.phone,
-              c.address
-       FROM loan_cycles lc
-       JOIN clients c ON c.id = lc.client_id
-       WHERE lc.company_id = ? AND lc.month_year = ? AND c.status != 'deleted' AND lc.status != 'archived'
-       ORDER BY c.sl_no ASC`,
-      [companyId, month_year]
-    );
+      // Calculate actual days in this specific month (e.g. Feb: 28/29, Apr: 30, May: 31)
+      const [yearNum, monthNum] = month_year.split('-').map(Number);
+      const totalDays = (yearNum && monthNum) ? new Date(yearNum, monthNum, 0).getDate() : 31;
 
-    // 2. Fetch all collections for these cycles in this month
-    const collections = await query(
-      `SELECT dc.cycle_id,
-              dc.client_id,
-              dc.day_number,
-              dc.amount,
-              dc.payment_mode,
-              dc.collected_by,
-              dc.collection_date
-       FROM daily_collections dc
-       JOIN loan_cycles lc ON lc.id = dc.cycle_id
-       WHERE lc.company_id = ? AND lc.month_year = ?`,
-      [companyId, month_year]
-    );
-
-    // Calculate actual days in this specific month (e.g. Feb: 28/29, Apr: 30, May: 31)
-    const [yearNum, monthNum] = month_year.split('-').map(Number);
-    const totalDays = (yearNum && monthNum) ? new Date(yearNum, monthNum, 0).getDate() : 31;
-
-    // Group collections by cycle_id
-    const collectionsByCycle = {};
-    const columnSums = {};
-    for (let d = 1; d <= totalDays; d++) {
-      columnSums[d] = 0;
-    }
-
-    collections.forEach(col => {
-      if (!collectionsByCycle[col.cycle_id]) {
-        collectionsByCycle[col.cycle_id] = {};
-      }
-      collectionsByCycle[col.cycle_id][col.day_number] = col.amount;
-    });
-
-    let grandPrincipal = 0;
-    let grandCollected = 0;
-    let grandRemaining = 0;
-    let grandExcess = 0;
-
-    // Assemble grid rows with live calculations for actual days in month
-    const rows = cycles.map(c => {
-      const days = {};
-      let rowTotal = 0;
-
+      // Group collections by cycle_id
+      const collectionsByCycle = {};
+      const columnSums = {};
       for (let d = 1; d <= totalDays; d++) {
-        const amt = collectionsByCycle[c.cycle_id]?.[d] || 0;
-        days[d] = amt;
-        rowTotal += amt;
-        columnSums[d] += amt;
+        columnSums[d] = 0;
       }
 
-      const principal = c.principal || 0;
-      const remaining = c.cycle_status === 'closed' ? 0 : Math.max(0, principal - rowTotal);
-      const excess = Math.max(0, rowTotal - principal);
-      const isCleared = remaining === 0 || c.cycle_status === 'closed';
+      collections.forEach(col => {
+        if (!collectionsByCycle[col.cycle_id]) {
+          collectionsByCycle[col.cycle_id] = {};
+        }
+        collectionsByCycle[col.cycle_id][col.day_number] = col.amount;
+      });
 
-      grandPrincipal += principal;
-      grandCollected += rowTotal;
-      grandRemaining += remaining;
-      grandExcess += excess;
+      let grandPrincipal = 0;
+      let grandCollected = 0;
+      let grandRemaining = 0;
+      let grandExcess = 0;
+
+      // Assemble grid rows with live calculations for actual days in month
+      const rows = cycles.map(c => {
+        const days = {};
+        let rowTotal = 0;
+
+        for (let d = 1; d <= totalDays; d++) {
+          const amt = collectionsByCycle[c.cycle_id]?.[d] || 0;
+          days[d] = amt;
+          rowTotal += amt;
+          columnSums[d] += amt;
+        }
+
+        const principal = c.principal || 0;
+        const remaining = c.cycle_status === 'closed' ? 0 : Math.max(0, principal - rowTotal);
+        const excess = Math.max(0, rowTotal - principal);
+        const isCleared = remaining === 0 || c.cycle_status === 'closed';
+
+        grandPrincipal += principal;
+        grandCollected += rowTotal;
+        grandRemaining += remaining;
+        grandExcess += excess;
+
+        return {
+          cycle_id: c.cycle_id,
+          client_id: c.client_id,
+          sl_no: c.sl_no,
+          client_code: c.client_code,
+          name: c.name,
+          phone: c.phone,
+          address: c.address,
+          principal,
+          days,
+          total_collected: rowTotal,
+          remaining,
+          excess,
+          is_cleared: isCleared,
+          cycle_status: c.cycle_status
+        };
+      });
 
       return {
-        cycle_id: c.cycle_id,
-        client_id: c.client_id,
-        sl_no: c.sl_no,
-        client_code: c.client_code,
-        name: c.name,
-        phone: c.phone,
-        address: c.address,
-        principal,
-        days,
-        total_collected: rowTotal,
-        remaining,
-        excess,
-        is_cleared: isCleared,
-        cycle_status: c.cycle_status
+        success: true,
+        month_year,
+        total_days: totalDays,
+        rows,
+        summary: {
+          total_principal: grandPrincipal,
+          total_collected: grandCollected,
+          total_remaining: grandRemaining,
+          total_excess: grandExcess,
+          client_count: rows.length,
+          column_sums: columnSums
+        }
       };
-    });
+    }, 5 * 60 * 1000, ['grid', `month_${month_year}`]);
 
-    const payload = {
-      success: true,
-      month_year,
-      total_days: totalDays,
-      rows,
-      summary: {
-        total_principal: grandPrincipal,
-        total_collected: grandCollected,
-        total_remaining: grandRemaining,
-        total_excess: grandExcess,
-        client_count: rows.length,
-        column_sums: columnSums
-      }
-    };
-
-    serverCache.set(cacheKey, payload, 60 * 1000, ['grid', `month_${month_year}`]);
     res.json(payload);
   } catch (err) {
+    console.error('[GRID] Error serving grid data:', err.message);
+    const month_year = req.query.month_year || '2026-05';
+    const stale = serverCache.getStale(`grid_${month_year}`);
+    if (stale) {
+      console.warn(`[GRID] Serving stale snapshot for ${month_year} to preserve 100% uptime`);
+      return res.json({ ...stale, is_stale_fallback: true });
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -387,6 +389,68 @@ router.post('/reopen-client', async (req, res) => {
     res.json({
       success: true,
       message: 'Loan successfully reopened and restored to active register!'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST Reset Client Collections (Clear all month payments to 0)
+router.post('/reset-client', async (req, res) => {
+  try {
+    const { cycle_id, client_id } = req.body;
+    if (!cycle_id) {
+      return res.status(400).json({ success: false, error: 'cycle_id is required' });
+    }
+
+    // 1. Delete all daily collections recorded for this cycle
+    await execute('DELETE FROM daily_collections WHERE cycle_id = ?', [cycle_id]);
+
+    // 2. If the cycle was marked closed, restore it back to active
+    await execute("UPDATE loan_cycles SET status = 'active', close_date = NULL WHERE id = ?", [cycle_id]);
+
+    // 3. Remove from closed_clients archive if it was archived
+    await execute('DELETE FROM closed_clients WHERE cycle_id = ?', [cycle_id]);
+
+    // 4. Ensure client is active
+    if (client_id) {
+      await execute("UPDATE clients SET status = 'active' WHERE id = ?", [client_id]);
+    }
+
+    // 5. Invalidate caches
+    serverCache.invalidateTag('grid');
+    serverCache.invalidateTag('reports');
+    serverCache.invalidateTag('clients');
+
+    res.json({
+      success: true,
+      message: 'Client collections successfully reset to ₹0'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST Remove Client from Active Month Register (without deleting permanent borrower)
+router.post('/remove-from-month', async (req, res) => {
+  try {
+    const { cycle_id } = req.body;
+    if (!cycle_id) {
+      return res.status(400).json({ success: false, error: 'cycle_id is required' });
+    }
+
+    // Delete collections for this cycle and archive the cycle
+    await execute('DELETE FROM daily_collections WHERE cycle_id = ?', [cycle_id]);
+    await execute("UPDATE loan_cycles SET status = 'archived' WHERE id = ?", [cycle_id]);
+
+    // Invalidate caches
+    serverCache.invalidateTag('grid');
+    serverCache.invalidateTag('reports');
+    serverCache.invalidateTag('months');
+
+    res.json({
+      success: true,
+      message: 'Borrower cycle removed from this month register'
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

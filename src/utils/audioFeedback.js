@@ -19,6 +19,25 @@ export function setSoundEnabled(enabled) {
   }
 }
 
+let sharedAudioCtx = null;
+
+function getSharedAudioContext() {
+  if (typeof window === 'undefined') return null;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return null;
+  try {
+    if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') {
+      sharedAudioCtx = new AudioContext();
+    }
+    if (sharedAudioCtx.state === 'suspended') {
+      sharedAudioCtx.resume().catch(() => {});
+    }
+    return sharedAudioCtx;
+  } catch (_) {
+    return null;
+  }
+}
+
 /**
  * Plays an authentic crisp cash-register bell chime (dual-frequency harmonic)
  * and triggers mobile haptic vibration.
@@ -36,10 +55,8 @@ export function playCashRegisterChime() {
   if (!isSoundEnabled()) return;
 
   try {
-    if (typeof window === 'undefined') return;
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
     const now = ctx.currentTime;
 
     // Primary Bell Tone: B5 (987.77 Hz) sliding to E6 (1318.51 Hz)
@@ -70,13 +87,6 @@ export function playCashRegisterChime() {
     gain2.connect(ctx.destination);
     osc2.start(now + 0.06);
     osc2.stop(now + 0.45);
-
-    // Clean up context after audio completes
-    setTimeout(() => {
-      try {
-        ctx.close();
-      } catch (e) {}
-    }, 550);
   } catch (err) {
     console.warn('Audio chime notice:', err);
   }
@@ -96,10 +106,8 @@ export function playUndoSound() {
   if (!isSoundEnabled()) return;
 
   try {
-    if (typeof window === 'undefined') return;
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
+    const ctx = getSharedAudioContext();
+    if (!ctx) return;
     const now = ctx.currentTime;
 
     const osc = ctx.createOscillator();
@@ -115,12 +123,6 @@ export function playUndoSound() {
     gain.connect(ctx.destination);
     osc.start(now);
     osc.stop(now + 0.22);
-
-    setTimeout(() => {
-      try {
-        ctx.close();
-      } catch (e) {}
-    }, 300);
   } catch (err) {
     console.warn('Undo audio notice:', err);
   }

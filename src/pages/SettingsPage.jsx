@@ -1,14 +1,78 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
-import { Settings, Database, Download, Upload, ShieldCheck, Moon, Sun, Clock, Languages, Store, CheckCircle, AlertCircle } from 'lucide-react';
+import { useCompany } from '../context/CompanyContext';
+import { Settings, Database, Download, Upload, ShieldCheck, Moon, Sun, Clock, Languages, Store, CheckCircle, AlertCircle, Edit3, Save, X } from 'lucide-react';
 
 export default function SettingsPage() {
   const { lang, setLang, t } = useLanguage();
   const { themeMode, setThemeMode } = useTheme();
+  const { company, updateCompany, loading: companyLoading } = useCompany();
   const [dbStatus, setDbStatus] = useState(null);
   const [restoreMessage, setRestoreMessage] = useState(null);
   const [restoring, setRestoring] = useState(false);
+
+  // Shop Profile editable state
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    tagline: '',
+    phone: '',
+    address: ''
+  });
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState(null);
+
+  useEffect(() => {
+    if (company) {
+      setProfileForm({
+        name: company.name || '',
+        tagline: company.tagline || '',
+        phone: company.phone || '',
+        address: company.address || ''
+      });
+    }
+  }, [company]);
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    if (!profileForm.name || profileForm.name.trim().length < 2) {
+      setProfileMessage({
+        type: 'error',
+        text: lang === 'ta' ? 'நிறுவனப் பெயர் குறைந்தது 2 எழுத்துக்கள் இருக்க வேண்டும்' : 'Shop name must be at least 2 characters'
+      });
+      return;
+    }
+    setProfileSaving(true);
+    setProfileMessage(null);
+    const res = await updateCompany(profileForm);
+    setProfileSaving(false);
+    if (res.success) {
+      setProfileMessage({
+        type: 'success',
+        text: lang === 'ta' ? 'நிறுவன விவரங்கள் வெற்றிகரமாகப் புதுப்பிக்கப்பட்டன!' : 'Shop profile updated successfully!'
+      });
+      setIsEditingProfile(false);
+    } else {
+      setProfileMessage({
+        type: 'error',
+        text: res.error || (lang === 'ta' ? 'புதுப்பிக்க முடியவில்லை' : 'Failed to update')
+      });
+    }
+  };
+
+  const handleCancelProfile = () => {
+    if (company) {
+      setProfileForm({
+        name: company.name || '',
+        tagline: company.tagline || '',
+        phone: company.phone || '',
+        address: company.address || ''
+      });
+    }
+    setIsEditingProfile(false);
+    setProfileMessage(null);
+  };
 
   const loadStatus = () => {
     fetch('/api/backup/status')
@@ -118,25 +182,134 @@ export default function SettingsPage() {
 
       {/* Shop Profile Information */}
       <div className="card">
-        <h3 style={{ fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
-          <Store size={18} color="var(--emerald-primary)" />
-          <span>{lang === 'ta' ? 'ஃபைனான்ஸ் நிறுவன விவரங்கள் (Shop Profile)' : 'Shop Profile Information'}</span>
-        </h3>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div>
-            <label className="form-label">{lang === 'ta' ? 'நிறுவனப் பெயர்' : 'Shop Name'}</label>
-            <input type="text" className="form-input" readOnly value="ALR Finance (ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ்)" />
-          </div>
-          <div>
-            <label className="form-label">{lang === 'ta' ? 'தொடர்பு எண்' : 'Phone'}</label>
-            <input type="text" className="form-input font-mono" readOnly value="9585194934" />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label className="form-label">{lang === 'ta' ? 'முகவரி' : 'Address'}</label>
-            <input type="text" className="form-input" readOnly value="அலங்காநல்லூர், மதுரை (Alanganallur, Madurai)" />
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            <Store size={18} color="var(--emerald-primary)" />
+            <span>{lang === 'ta' ? 'ஃபைனான்ஸ் நிறுவன விவரங்கள் (Shop Profile)' : 'Shop Profile Information'}</span>
+          </h3>
+          {!isEditingProfile ? (
+            <button
+              type="button"
+              onClick={() => {
+                setIsEditingProfile(true);
+                setProfileMessage(null);
+              }}
+              className="btn btn-sm btn-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Edit3 size={14} />
+              <span>{lang === 'ta' ? 'விவரங்களைத் திருத்து' : 'Edit Profile'}</span>
+            </button>
+          ) : (
+            <span className="badge badge-emerald" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+              <Edit3 size={12} />
+              <span>{lang === 'ta' ? 'திருத்தும் முறை' : 'Editing Active'}</span>
+            </span>
+          )}
         </div>
+
+        {profileMessage && (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: '14px',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: profileMessage.type === 'success' ? 'var(--emerald-light)' : 'var(--rose-light)',
+              color: profileMessage.type === 'success' ? 'var(--emerald-text)' : 'var(--rose-text)'
+            }}
+          >
+            {profileMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+            <span>{profileMessage.text}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSaveProfile}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div>
+              <label className="form-label">{lang === 'ta' ? 'நிறுவனப் பெயர் (Shop Name)' : 'Shop Name'} *</label>
+              <input
+                type="text"
+                className="form-input"
+                required
+                readOnly={!isEditingProfile}
+                value={profileForm.name}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
+                style={!isEditingProfile ? { background: 'var(--bg-surface-hover)', cursor: 'default' } : { borderColor: 'var(--emerald-primary)' }}
+                placeholder="ALR Finance (ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ்)"
+              />
+            </div>
+            <div>
+              <label className="form-label">{lang === 'ta' ? 'தொடர்பு எண் (Phone)' : 'Phone Number'} *</label>
+              <input
+                type="tel"
+                className="form-input font-mono"
+                required
+                readOnly={!isEditingProfile}
+                value={profileForm.phone}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
+                style={!isEditingProfile ? { background: 'var(--bg-surface-hover)', cursor: 'default' } : { borderColor: 'var(--emerald-primary)' }}
+                placeholder="9585194934"
+              />
+            </div>
+            <div>
+              <label className="form-label">{lang === 'ta' ? 'துணைப் பெயர் / கிளை (Tagline / Branch)' : 'Tagline / Branch'}</label>
+              <input
+                type="text"
+                className="form-input"
+                readOnly={!isEditingProfile}
+                value={profileForm.tagline}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, tagline: e.target.value }))}
+                style={!isEditingProfile ? { background: 'var(--bg-surface-hover)', cursor: 'default' } : { borderColor: 'var(--emerald-primary)' }}
+                placeholder="ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ் • அலங்காநல்லூர்"
+              />
+            </div>
+            <div>
+              <label className="form-label">{lang === 'ta' ? 'முகவரி (Address)' : 'Shop Address'} *</label>
+              <input
+                type="text"
+                className="form-input"
+                required
+                readOnly={!isEditingProfile}
+                value={profileForm.address}
+                onChange={(e) => setProfileForm(prev => ({ ...prev, address: e.target.value }))}
+                style={!isEditingProfile ? { background: 'var(--bg-surface-hover)', cursor: 'default' } : { borderColor: 'var(--emerald-primary)' }}
+                placeholder="அலங்காநல்லூர், மதுரை (Alanganallur, Madurai)"
+              />
+            </div>
+          </div>
+
+          {isEditingProfile && (
+            <div style={{ display: 'flex', gap: '10px', marginTop: '16px', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={handleCancelProfile}
+                className="btn btn-secondary"
+                disabled={profileSaving}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <X size={15} />
+                <span>{lang === 'ta' ? 'ரத்து செய்' : 'Cancel'}</span>
+              </button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={profileSaving}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Save size={15} />
+                <span>
+                  {profileSaving
+                    ? (lang === 'ta' ? 'சேமிக்கப்படுகிறது...' : 'Saving...')
+                    : (lang === 'ta' ? 'மாற்றங்களைச் சேமிக்கவும்' : 'Save Changes')}
+                </span>
+              </button>
+            </div>
+          )}
+        </form>
       </div>
 
       {/* Database & Cloud Backup */}

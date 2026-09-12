@@ -7,44 +7,39 @@ const router = Router();
 // GET all active and historical month cycles
 router.get('/', async (req, res) => {
   try {
-    const cached = serverCache.get('months_list');
-    if (cached) {
-      return res.json(cached);
-    }
+    const payload = await serverCache.getOrFetch('months_list', async () => {
+      const companyId = 'comp_alr_001';
+      const months = await query(
+        `SELECT DISTINCT month_year, cycle_name,
+                COUNT(DISTINCT client_id) as total_clients,
+                SUM(principal) as total_principal,
+                MIN(start_date) as start_date,
+                MAX(end_date) as end_date
+         FROM loan_cycles
+         WHERE company_id = ?
+         GROUP BY month_year, cycle_name
+         ORDER BY month_year ASC`,
+        [companyId]
+      );
 
-    const companyId = 'comp_alr_001';
-    const months = await query(
-      `SELECT DISTINCT month_year, cycle_name,
-              COUNT(DISTINCT client_id) as total_clients,
-              SUM(principal) as total_principal,
-              MIN(start_date) as start_date,
-              MAX(end_date) as end_date
-       FROM loan_cycles
-       WHERE company_id = ?
-       GROUP BY month_year, cycle_name
-       ORDER BY month_year ASC`,
-      [companyId]
-    );
+      // Fallback if no months exist
+      if (months.length === 0) {
+        return {
+          success: true,
+          data: [{ month_year: '2026-05', cycle_name: 'May 2026 (வைகாசி)', total_clients: 0, total_principal: 0 }]
+        };
+      }
 
-    // Fallback if no months exist
-    if (months.length === 0) {
-      const fallback = {
-        success: true,
-        data: [{ month_year: '2026-05', cycle_name: 'May 2026 (வைகாசி)', total_clients: 0, total_principal: 0 }]
-      };
-      serverCache.set('months_list', fallback, 60 * 1000, ['months']);
-      return res.json(fallback);
-    }
+      // Attach actual total_days for each month
+      const monthsWithDays = months.map(m => {
+        const [y, mon] = (m.month_year || '').split('-').map(Number);
+        const days = (y && mon) ? new Date(y, mon, 0).getDate() : 31;
+        return { ...m, total_days: days };
+      });
 
-    // Attach actual total_days for each month
-    const monthsWithDays = months.map(m => {
-      const [y, mon] = (m.month_year || '').split('-').map(Number);
-      const days = (y && mon) ? new Date(y, mon, 0).getDate() : 31;
-      return { ...m, total_days: days };
-    });
+      return { success: true, data: monthsWithDays };
+    }, 5 * 60 * 1000, ['months']);
 
-    const payload = { success: true, data: monthsWithDays };
-    serverCache.set('months_list', payload, 60 * 1000, ['months']);
     res.json(payload);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

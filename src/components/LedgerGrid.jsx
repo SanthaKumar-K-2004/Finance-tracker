@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { MessageSquare, Printer, CheckCircle2, AlertCircle, Edit, Trash2, Phone, MapPin, Lock, Unlock } from 'lucide-react';
+import { MessageSquare, Printer, CheckCircle2, AlertCircle, Edit, Trash2, Phone, MapPin, Lock, Unlock, RotateCcw } from 'lucide-react';
 
 export default function LedgerGrid({
   gridData,
@@ -9,7 +9,8 @@ export default function LedgerGrid({
   onOpenReceipt,
   onCloseClient,
   onEditClient,
-  onDeleteClient
+  onDeleteClient,
+  onResetClient
 }) {
   const { lang, t } = useLanguage();
   const todayDayNumber = new Date().getDate();
@@ -210,26 +211,24 @@ export default function LedgerGrid({
                       onClick={() => onEditClient && onEditClient(row)}
                       title={lang === 'ta' ? 'வாடிக்கையாளர் விவரங்கள் திருத்த கிளிக் செய்க' : 'Click to edit borrower details'}
                     >
+                      {row.address && (
+                        <div className="grid-client-address-above" title={row.address}>
+                          <MapPin size={11} style={{ flexShrink: 0 }} />
+                          <span>{row.address}</span>
+                        </div>
+                      )}
                       <div className="grid-client-title-row">
                         <span className="grid-client-name">{row.name}</span>
                         <span className="grid-edit-indicator" title="Edit">
                           <Edit size={13} />
                         </span>
                       </div>
-                      <div className="grid-client-meta">
-                        {row.phone && (
-                          <span className="grid-meta-item">
-                            <Phone size={11} style={{ verticalAlign: 'middle', marginRight: '2px' }} />
-                            <span>{row.phone}</span>
-                          </span>
-                        )}
-                        {row.address && (
-                          <span className="grid-meta-item">
-                            <MapPin size={11} style={{ verticalAlign: 'middle', marginRight: '2px' }} />
-                            <span>{row.address}</span>
-                          </span>
-                        )}
-                      </div>
+                      {row.phone && (
+                        <div className="grid-client-phone-sub">
+                          <Phone size={11} style={{ flexShrink: 0 }} />
+                          <span className="font-mono">{row.phone}</span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Sticky Principal Amount - Click to Edit (Clean format, no subtext /days) */}
@@ -361,10 +360,21 @@ export default function LedgerGrid({
                           <Edit size={14} />
                         </button>
 
+                        {/* Reset Collections Button */}
+                        <button
+                          type="button"
+                          onClick={() => onResetClient && onResetClient(row)}
+                          className="btn-icon"
+                          style={{ padding: '4px', color: 'var(--amber-primary)' }}
+                          title={lang === 'ta' ? 'வசூல் மீட்டமை (0 ஆக்குக)' : 'Reset Collections to ₹0'}
+                        >
+                          <RotateCcw size={14} />
+                        </button>
+
                         {/* Delete Borrower Button */}
                         <button
                           type="button"
-                          onClick={() => onDeleteClient && onDeleteClient(row.client_id, row.name)}
+                          onClick={() => onDeleteClient && onDeleteClient(row.client_id, row.name, row.cycle_id)}
                           className="btn-icon"
                           style={{ padding: '4px', color: 'var(--rose-primary)' }}
                           title={lang === 'ta' ? 'நீக்குக' : 'Delete Borrower'}
