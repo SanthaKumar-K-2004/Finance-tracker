@@ -22,6 +22,9 @@ router.get(['/', '/grid'], async (req, res) => {
                   lc.cycle_name,
                   lc.principal,
                   lc.status as cycle_status,
+                  lc.start_date,
+                  lc.end_date,
+                  lc.total_days,
                   c.id as client_id,
                   c.sl_no,
                   c.client_code,
@@ -108,7 +111,11 @@ router.get(['/', '/grid'], async (req, res) => {
           remaining,
           excess,
           is_cleared: isCleared,
-          cycle_status: c.cycle_status
+          cycle_status: c.cycle_status,
+          start_date: c.start_date || `${month_year}-01`,
+          end_date: c.end_date || `${month_year}-${totalDays}`,
+          month_year: c.month_year || month_year,
+          total_days: c.total_days || totalDays
         };
       });
 

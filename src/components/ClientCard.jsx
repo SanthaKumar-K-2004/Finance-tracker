@@ -80,7 +80,7 @@ export default function ClientCard({
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span className="sl-no-badge font-mono">
-              #{client.sl_no}
+              {client.sl_no}
             </span>
             <h3 className="client-name-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span>{client.name}</span>
@@ -124,7 +124,7 @@ export default function ClientCard({
         <div className="completion-ribbon">
           <div className="completion-ribbon-text">
             <CheckCircle2 size={15} color="var(--emerald-primary)" />
-            <span>{lang === 'ta' ? 'கடன் முழுவதும் வசூலிக்கப்பட்டது' : 'Loan 100% Cleared (₹0 Due)'}</span>
+            <span>{lang === 'ta' ? 'தவணை முழுவதும் வசூலிக்கப்பட்டது' : 'Thavanai 100% Cleared (₹0 Due)'}</span>
           </div>
           <button
             type="button"
@@ -286,14 +286,14 @@ export default function ClientCard({
                   {lang === 'ta' ? 'முழு நிலுவை வசூல் உறுதிப்படுத்தல்' : 'Confirm Full Due Settlement'}
                 </h4>
                 <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                  #{client.sl_no} {client.name}
+                  {client.sl_no} {client.name}
                 </span>
               </div>
             </div>
 
             <div style={{ background: 'var(--bg-surface-hover)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
-                <span style={{ color: 'var(--text-secondary)' }}>{lang === 'ta' ? 'அசல் கடன்:' : 'Principal:'}</span>
+                <span style={{ color: 'var(--text-secondary)' }}>{lang === 'ta' ? 'தவணை அசல்:' : 'Principal:'}</span>
                 <span className="font-mono" style={{ fontWeight: 700 }}>₹{client.principal.toLocaleString('en-IN')}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
@@ -302,7 +302,7 @@ export default function ClientCard({
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', borderTop: '1px solid var(--border-subtle)', paddingTop: '8px', marginTop: '6px' }}>
                 <span style={{ fontWeight: 800, color: 'var(--emerald-primary)' }}>
-                  {lang === 'ta' ? 'கடன் நிறைவு தொகை:' : 'Settlement Due:'}
+                  {lang === 'ta' ? 'தவணை நிறைவு தொகை:' : 'Settlement Due:'}
                 </span>
                 <span className="font-mono" style={{ fontWeight: 800, color: 'var(--emerald-primary)', fontSize: '16px' }}>
                   ₹{client.remaining.toLocaleString('en-IN')}

@@ -31,7 +31,7 @@ export default function CollectionModal({
           <div>
             <h2 className="modal-title">{lang === 'ta' ? 'வசூல் பதிவு செய்தல்' : 'Record Collection Entry'}</h2>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              {client.name} (#{client.sl_no})
+              {client.name} ({client.sl_no})
             </p>
           </div>
           <button type="button" onClick={onClose} className="btn-icon">

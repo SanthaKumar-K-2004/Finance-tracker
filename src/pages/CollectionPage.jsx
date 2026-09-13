@@ -104,17 +104,38 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
   // Calendar days take strict precedence so Feb is 28, Apr is 30, etc.
   const totalDays = currentMonthDays || gridData?.total_days || 31;
 
-  // Selected collection day for Card View, clamped to month's total days
+  // Current calendar month check (e.g. '2026-09')
+  const isCurrentCalendarMonth = useMemo(() => {
+    const now = new Date();
+    const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return activeMonth === currentYearMonth;
+  }, [activeMonth]);
+
+  // Selected collection day for Card View: defaults to today if current month, otherwise day 1
   const defaultInitialDay = useMemo(() => {
-    const today = new Date().getDate();
-    return Math.min(today, totalDays);
-  }, [totalDays]);
+    if (isCurrentCalendarMonth) {
+      return Math.min(new Date().getDate(), totalDays);
+    }
+    return 1;
+  }, [isCurrentCalendarMonth, totalDays]);
 
   const [cardDay, setCardDay] = useState(defaultInitialDay);
 
+  // Synchronize cardDay whenever activeMonth or totalDays changes
   useEffect(() => {
-    setCardDay(prev => Math.max(1, Math.min(prev, totalDays)));
-  }, [totalDays]);
+    if (isCurrentCalendarMonth) {
+      setCardDay(Math.min(new Date().getDate(), totalDays));
+    } else {
+      setCardDay(1);
+    }
+  }, [activeMonth, isCurrentCalendarMonth, totalDays]);
+
+  // Formatted DD/MM/YYYY date for active cardDay
+  const formattedDayDate = useMemo(() => {
+    if (!activeMonth || !activeMonth.includes('-')) return '';
+    const [y, m] = activeMonth.split('-');
+    return `${String(cardDay).padStart(2, '0')}/${m}/${y}`;
+  }, [activeMonth, cardDay]);
 
   // Floating 8-second Undo Action State
   const [undoAction, setUndoAction] = useState(null); // { cycleId, clientId, clientName, day, prevAmount, newAmount, countdown }
@@ -874,8 +895,10 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
             client: {
               ...client,
               total_days: totalDays,
-              selected_day: client.selected_day || cardDay,
-              current_payment: client.current_payment !== undefined ? client.current_payment : (client.days?.[cardDay] || 0)
+              month_year: client.month_year || activeMonth,
+              start_date: client.start_date || `${activeMonth}-01`,
+              selected_day: client.selected_day || (isCurrentCalendarMonth ? new Date().getDate() : 1),
+              current_payment: client.current_payment !== undefined ? client.current_payment : (client.days?.[isCurrentCalendarMonth ? new Date().getDate() : 1] || 0)
             },
             mode
           })}
@@ -918,7 +941,7 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
                 <ChevronLeft size={16} />
               </button>
               <span className="badge badge-emerald font-mono" style={{ fontSize: '13px', fontWeight: 800, padding: '4px 12px' }}>
-                {lang === 'ta' ? `நாள் ${cardDay} / ${totalDays}` : `Day ${cardDay} of ${totalDays}`}
+                {lang === 'ta' ? `நாள் ${cardDay} / ${totalDays} (${formattedDayDate})` : `Day ${cardDay} of ${totalDays} (${formattedDayDate})`}
               </span>
               <button
                 type="button"
@@ -965,6 +988,8 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
                     client: {
                       ...c,
                       total_days: totalDays,
+                      month_year: c.month_year || activeMonth,
+                      start_date: c.start_date || `${activeMonth}-01`,
                       selected_day: c.selected_day || cardDay,
                       current_payment: c.current_payment !== undefined ? c.current_payment : (c.days?.[cardDay] || 0)
                     },
@@ -1059,7 +1084,7 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
                   {lang === 'ta' ? 'வசூல் தொகையை மீட்டமைக்கவா?' : 'Reset Borrower Collections?'}
                 </h3>
                 <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  #{clientToReset.sl_no} {clientToReset.name}
+                  {clientToReset.sl_no} {clientToReset.name}
                 </span>
               </div>
             </div>
@@ -1122,7 +1147,7 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
                   {lang === 'ta' ? 'வாடிக்கையாளரை நீக்குதல்' : 'Delete Borrower Options'}
                 </h3>
                 <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                  #{clientToDelete.sl_no} {clientToDelete.name}
+                  {clientToDelete.sl_no} {clientToDelete.name}
                 </span>
               </div>
             </div>

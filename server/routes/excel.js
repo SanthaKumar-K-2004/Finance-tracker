@@ -404,7 +404,7 @@ router.post('/preview', upload.single('file'), async (req, res) => {
 
         if (dbPhoneMap.has(phone)) {
           const match = dbPhoneMap.get(phone);
-          rowIssues.push(`Phone already registered to ${match.name} (#${match.sl_no})`);
+          rowIssues.push(`Phone already registered to ${match.name} (${match.sl_no})`);
           if (status !== 'invalid') status = 'warning';
           duplicatePhonesCount++;
         }

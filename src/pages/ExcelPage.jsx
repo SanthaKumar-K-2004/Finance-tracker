@@ -345,7 +345,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
             </div>
 
             <div style={{ background: 'var(--bg-surface-hover)', padding: '10px 14px', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{lang === 'ta' ? 'மொத்த அசல் கடன்' : 'Total Principal'}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{lang === 'ta' ? 'மொத்த தவணை அசல்' : 'Total Principal'}</div>
               <div style={{ fontSize: '18px', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>₹{previewData.summary.total_principal.toLocaleString('en-IN')}</div>
             </div>
 

@@ -278,7 +278,7 @@ export default function BulkEntryModal({
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {isSelected ? <CheckSquare size={15} color="var(--emerald-primary)" /> : <Square size={15} color="var(--text-muted)" />}
                         <span className="badge badge-indigo font-mono" style={{ fontSize: '10px', padding: '1px 5px' }}>
-                          #{c.sl_no}
+                          {c.sl_no}
                         </span>
                         <span style={{ fontWeight: 600 }}>{c.name}</span>
                         {c.address && <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>({c.address})</span>}

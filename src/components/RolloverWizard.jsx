@@ -103,7 +103,7 @@ export default function RolloverWizard({ fromMonth, onRolloverComplete, onClose 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
                 <div style={{ background: 'var(--emerald-light)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--emerald-border)' }}>
                   <div style={{ fontSize: '12px', color: 'var(--emerald-text)', fontWeight: 600 }}>
-                    {lang === 'ta' ? 'நிறைவுற்ற கடன்கள் (Archive)' : 'Fully Paid Loans'}:
+                    {lang === 'ta' ? 'நிறைவுற்ற தவணைகள் (Archive)' : 'Fully Paid Thavanai'}:
                   </div>
                   <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--emerald-primary)', fontFamily: 'var(--font-mono)' }}>
                     {preview.summary.completed_count}
@@ -115,7 +115,7 @@ export default function RolloverWizard({ fromMonth, onRolloverComplete, onClose 
 
                 <div style={{ background: 'var(--amber-light)', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--amber-border)' }}>
                   <div style={{ fontSize: '12px', color: 'var(--amber-text)', fontWeight: 600 }}>
-                    {lang === 'ta' ? 'தொடரும் நிலுவைக் கடன்கள்' : 'Pending Rollovers'}:
+                    {lang === 'ta' ? 'தொடரும் நிலுவைத் தவணைகள்' : 'Pending Rollovers'}:
                   </div>
                   <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--amber-primary)', fontFamily: 'var(--font-mono)' }}>
                     {preview.summary.pending_count}

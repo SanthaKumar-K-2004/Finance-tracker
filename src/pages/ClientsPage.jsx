@@ -49,7 +49,7 @@ export default function ClientsPage({ activeMonth }) {
 
   const handleReset = async (client) => {
     if (!client.active_cycle_id) {
-      alert(lang === 'ta' ? 'இந்த வாடிக்கையாளருக்கு தற்போதைய மாதத்தில் நேரடி வசூல் கடன் இல்லை.' : 'No active cycle found for this borrower.');
+      alert(lang === 'ta' ? 'இந்த வாடிக்கையாளருக்கு தற்போதைய மாதத்தில் நேரடி தவணை இல்லை.' : 'No active cycle found for this borrower.');
       return;
     }
     const confirmMsg = lang === 'ta'
@@ -161,7 +161,7 @@ export default function ClientsPage({ activeMonth }) {
                       onClick={() => { setClientToEdit(c); setShowAddModal(true); }}
                       title={lang === 'ta' ? 'வாடிக்கையாளர் திருத்த கிளிக் செய்க' : 'Click to edit borrower'}
                     >
-                      <span className="sl-no-badge">#{c.sl_no}</span>
+                      <span className="sl-no-badge">{c.sl_no}</span>
                     </td>
                     <td
                       className="clickable-edit-cell"
@@ -304,7 +304,7 @@ export default function ClientsPage({ activeMonth }) {
               {/* Top Header: Sl. No, Name, and Principal */}
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="sl-no-badge font-mono">#{c.sl_no}</span>
+                  <span className="sl-no-badge font-mono">{c.sl_no}</span>
                   <div>
                     <div
                       style={{ fontWeight: 800, fontSize: '16px', color: 'var(--text-primary)', lineHeight: 1.2, cursor: 'pointer' }}
@@ -444,7 +444,14 @@ export default function ClientsPage({ activeMonth }) {
 
       {receiptClient && (
         <ReceiptModal
-          client={receiptClient}
+          client={{
+            ...receiptClient,
+            month_year: receiptClient.month_year || activeMonth,
+            start_date: receiptClient.start_date || `${receiptClient.month_year || activeMonth}-01`,
+            total_days: receiptClient.total_days || 31,
+            selected_day: 1,
+            current_payment: 0
+          }}
           initialType={receiptInitialType}
           mode={receiptInitialType === 'disbursement' ? 'print' : 'whatsapp'}
           onClose={() => setReceiptClient(null)}

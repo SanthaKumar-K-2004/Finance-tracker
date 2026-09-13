@@ -373,7 +373,7 @@ export default function Dashboard({ activeMonth }) {
         {/* Row 3: Loan Principal Range Chips */}
         <div className="mobile-chips-scroll" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', minWidth: '95px', flexShrink: 0 }}>
-            {lang === 'ta' ? 'கடன் அசல் வரம்பு:' : 'Loan Amount:'}
+            {lang === 'ta' ? 'தவணை அசல் வரம்பு:' : 'Loan Amount:'}
           </span>
           {[
             { id: 'all', labelTa: 'அனைத்து அளவுகள்', labelEn: 'All Ranges' },
@@ -404,7 +404,7 @@ export default function Dashboard({ activeMonth }) {
             { id: 'defaulter', labelTa: 'நிலுவை அதிகம் (At Risk)', labelEn: 'At Risk / Defaulters' },
             { id: 'paid_today', labelTa: 'இன்று வசூலானது', labelEn: 'Paid Today' },
             { id: 'pending_today', labelTa: 'இன்று நிலுவை', labelEn: 'Pending Today' },
-            { id: 'cleared', labelTa: 'முடிந்த கடன்கள் (Cleared)', labelEn: 'Fully Cleared' },
+            { id: 'cleared', labelTa: 'முடிந்த தவணைகள் (Cleared)', labelEn: 'Fully Cleared' },
             { id: 'zero_collection', labelTa: 'பூஜ்ஜிய வசூல் (0)', labelEn: 'Zero Collections' }
           ].map(s => (
             <button
@@ -434,7 +434,7 @@ export default function Dashboard({ activeMonth }) {
           <div className="stat-sub">
             {reactiveMetrics.isFiltered 
               ? (lang === 'ta' ? `வடிகட்டிய ${reactiveMetrics.activeClients} பேரின் அசல்` : `Filtered across ${reactiveMetrics.activeClients} clients`)
-              : (lang === 'ta' ? 'இந்த மாத மொத்த அசல் கடன்' : 'Principal deployed this cycle')}
+              : (lang === 'ta' ? 'இந்த மாத மொத்த தவணை அசல்' : 'Principal deployed this cycle')}
           </div>
         </div>
 
@@ -485,7 +485,7 @@ export default function Dashboard({ activeMonth }) {
           <div className="stat-sub">
             {reactiveMetrics.isFiltered
               ? (lang === 'ta' ? `${((reactiveMetrics.activeClients / (d.active_clients || 1)) * 100).toFixed(0)}% தெரிவு செய்யப்பட்டுள்ளது` : `${((reactiveMetrics.activeClients / (d.active_clients || 1)) * 100).toFixed(0)}% of active clients`)
-              : (lang === 'ta' ? `${d.total_closed_loans || 0} கடன்கள் நிறைவு பெற்றுள்ளன` : `${d.total_closed_loans || 0} loans closed so far`)}
+              : (lang === 'ta' ? `${d.total_closed_loans || 0} தவணைகள் நிறைவு பெற்றுள்ளன` : `${d.total_closed_loans || 0} loans closed so far`)}
           </div>
         </div>
       </div>
@@ -790,7 +790,7 @@ export default function Dashboard({ activeMonth }) {
                         flexShrink: 0
                       }}
                     >
-                      #{client.sl_no}
+                      {client.sl_no}
                     </div>
                     <div>
                       <div style={{ fontWeight: 800, fontSize: '13.5px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -845,7 +845,9 @@ export default function Dashboard({ activeMonth }) {
                         type="button"
                         onClick={() => setSelectedReceipt({
                           ...client,
-                          current_payment: client.today_paid || client.today_payment || 0,
+                          month_year: client.month_year || activeMonth,
+                          start_date: client.start_date || `${client.month_year || activeMonth}-01`,
+                          current_payment: client.paid_today || client.today_paid || 0,
                           selected_day: new Date().getDate()
                         })}
                         className="btn-icon"
@@ -994,7 +996,9 @@ export default function Dashboard({ activeMonth }) {
                           type="button"
                           onClick={() => setSelectedReceipt({
                             ...def,
-                            current_payment: def.today_paid || def.today_payment || 0,
+                            month_year: def.month_year || activeMonth,
+                            start_date: def.start_date || `${def.month_year || activeMonth}-01`,
+                            current_payment: def.paid_today || def.today_paid || 0,
                             selected_day: new Date().getDate()
                           })}
                           className="btn-icon"

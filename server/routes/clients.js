@@ -14,6 +14,9 @@ router.get('/', async (req, res) => {
                 lc.id as active_cycle_id,
                 lc.principal,
                 lc.month_year,
+                lc.start_date,
+                lc.end_date,
+                lc.total_days,
                 COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id), 0) as total_collected
          FROM clients c
          LEFT JOIN loan_cycles lc ON lc.client_id = c.id AND lc.status = 'active'

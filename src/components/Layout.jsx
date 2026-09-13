@@ -455,7 +455,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
                 <div className="mobile-more-icon-box" style={{ color: 'var(--indigo-primary)' }}>
                   <Archive size={20} />
                 </div>
-                <span>{lang === 'ta' ? 'நிறைவுற்ற கடன்கள்' : 'Closed Loans'}</span>
+                <span>{lang === 'ta' ? 'நிறைவுற்ற தவணைகள்' : 'Closed Thavanai'}</span>
               </NavLink>
 
               <NavLink 

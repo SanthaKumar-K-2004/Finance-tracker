@@ -28,7 +28,7 @@ describe('Phase 6: Excel Template Engine, WhatsApp Receipts & Verification', () 
         lang: 'ta',
         format: 'concise'
       });
-      const expected = 'வணக்கம் கார்த்திக், 09/09/2026 வசூல் தொகை: ₹350. மீதமுள்ள நிலுவை: ₹8,650. நன்றி, ALR ஃபைனான்ஸ்.';
+      const expected = 'வணக்கம் கார்த்திக், 09/09/2026 இன்றைய தவணை வரவு: ₹350. மீதமுள்ள தவணை நிலுவை: ₹8,650. நன்றி, ALR ஃபைனான்ஸ்.';
       assert.strictEqual(receipt, expected);
     });
 
@@ -42,7 +42,7 @@ describe('Phase 6: Excel Template Engine, WhatsApp Receipts & Verification', () 
         lang: 'en',
         format: 'concise'
       });
-      const expected = 'Dear Karthik, Collection received on 09/09/2026: ₹350. Remaining balance: ₹8,650. Thank you, ALR Finance.';
+      const expected = 'Dear Karthik, Thavanai collection on 09/09/2026: ₹350. Remaining balance: ₹8,650. Thank you, ALR Finance.';
       assert.strictEqual(receipt, expected);
     });
 
@@ -66,10 +66,11 @@ describe('Phase 6: Excel Template Engine, WhatsApp Receipts & Verification', () 
         lang: 'ta',
         format: 'detailed'
       });
-      assert.ok(detailedSlip.includes('ALR ஃபைனான்ஸ் — தினசரி வசூல் ரசீது'));
-      assert.ok(detailedSlip.includes('அசல் கடன்: ₹10,000'));
-      assert.ok(detailedSlip.includes('இன்று வசூல்: ₹350'));
-      assert.ok(detailedSlip.includes('மீதமுள்ள நிலுவை: ₹8,650'));
+      assert.ok(detailedSlip.includes('ALR ஃபைனான்ஸ் — தினசரி தவணை வரவு ரசீது'));
+      assert.ok(detailedSlip.includes('தவணை அசல்: ₹10,000'));
+      assert.ok(detailedSlip.includes('இன்று வரவு: ₹350'));
+      assert.ok(detailedSlip.includes('மீதமுள்ள தவணை நிலுவை: ₹8,650'));
+      assert.ok(detailedSlip.includes('வாடிக்கையாளர்: கார்த்திக் (1)'));
     });
 
     it('should format new loan disbursement slips', () => {
@@ -82,9 +83,10 @@ describe('Phase 6: Excel Template Engine, WhatsApp Receipts & Verification', () 
         principal: 10000,
         lang: 'ta'
       });
-      assert.ok(slip.includes('புதிய கடன் அசல் வழங்கல் ரசீது'));
-      assert.ok(slip.includes('வழங்கப்பட்ட அசல் கடன்: ₹10,000'));
-      assert.ok(slip.includes('கடன் தவணைக் காலம்: 31 நாட்கள்'));
+      assert.ok(slip.includes('புதிய தவணை அசல் வழங்கல் ரசீது'));
+      assert.ok(slip.includes('வழங்கப்பட்ட தவணை அசல்: ₹10,000'));
+      assert.ok(slip.includes('தவணைக் காலம்: 31 நாட்கள்'));
+      assert.ok(slip.includes('வாடிக்கையாளர்: முருகன் (5)'));
     });
   });
 

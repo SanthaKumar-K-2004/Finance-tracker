@@ -78,14 +78,15 @@ router.get('/dashboard', async (req, res) => {
         ),
         // 6. Defaulter Radar: Clients with high remaining balance
         safeQuery(
-          `SELECT c.id, c.sl_no, c.name, c.phone, c.address, lc.principal,
-                  COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id), 0) as total_collected
+          `SELECT c.id, c.sl_no, c.name, c.phone, c.address, lc.principal, lc.start_date, lc.month_year,
+                  COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id), 0) as total_collected,
+                  COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id AND collection_date = ?), 0) as paid_today
            FROM loan_cycles lc
            JOIN clients c ON c.id = lc.client_id
            WHERE lc.company_id = ? AND lc.month_year = ? AND c.status != 'deleted' AND lc.status != 'archived'
            ORDER BY (lc.principal - COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id), 0)) DESC
            LIMIT 10`,
-          [companyId, month_year]
+          [today, companyId, month_year]
         ),
         // 7. Daily Collection Velocity Trend (Days 1 to 31)
         safeQuery(
@@ -118,7 +119,7 @@ router.get('/dashboard', async (req, res) => {
         ),
         // 9. Lightweight Clients Summary for 0ms Real-Time Frontend Multi-Filtering
         safeQuery(
-          `SELECT c.id, c.sl_no, c.name, c.phone, c.address, lc.principal,
+          `SELECT c.id, c.sl_no, c.name, c.phone, c.address, lc.principal, lc.start_date, lc.month_year, lc.total_days,
                   COALESCE(coll.total_coll, 0) as total_collected,
                   COALESCE(today_coll.today_amt, 0) as paid_today
            FROM loan_cycles lc
@@ -177,6 +178,9 @@ router.get('/dashboard', async (req, res) => {
           total_collected: coll,
           remaining: rem,
           paid_today: Number(c.paid_today) || 0,
+          start_date: c.start_date || `${month_year}-01`,
+          month_year: c.month_year || month_year,
+          total_days: c.total_days || 31,
           is_cleared: coll >= p && p > 0
         };
       });
@@ -199,7 +203,10 @@ router.get('/dashboard', async (req, res) => {
           clients_summary: processedClients,
           defaulters: (defaulters || []).map(d => ({
             ...d,
-            remaining: Math.max(0, d.principal - d.total_collected)
+            paid_today: Number(d.paid_today) || 0,
+            remaining: Math.max(0, d.principal - d.total_collected),
+            start_date: d.start_date || `${month_year}-01`,
+            month_year: d.month_year || month_year
           }))
         }
       };

@@ -16,6 +16,14 @@ export default function LedgerGrid({
   const todayDayNumber = new Date().getDate();
   const [unlockedRows, setUnlockedRows] = useState({});
 
+  const isCurrentMonth = useMemo(() => {
+    const now = new Date();
+    const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return gridData?.month_year === currentYearMonth;
+  }, [gridData?.month_year]);
+
+  const activeReceiptDay = isCurrentMonth ? todayDayNumber : 1;
+
   const toggleRowLock = (cycleId) => {
     setUnlockedRows(prev => ({ ...prev, [cycleId]: !prev[cycleId] }));
   };
@@ -156,7 +164,7 @@ export default function LedgerGrid({
               <th className="col-sticky-3">{t('principal')}</th>
               {Array.from({ length: totalDays }, (_, i) => i + 1).map(day => {
                 const colW = dayColWidths[day] || 56;
-                const isToday = day === todayDayNumber;
+                const isToday = isCurrentMonth && day === todayDayNumber;
                 return (
                   <th
                     key={day}
@@ -202,7 +210,7 @@ export default function LedgerGrid({
                       onClick={() => onEditClient && onEditClient(row)}
                       title={lang === 'ta' ? 'வாடிக்கையாளர் திருத்த கிளிக் செய்க' : 'Click to edit borrower'}
                     >
-                      <span className="sl-no-badge">#{row.sl_no}</span>
+                      <span className="sl-no-badge">{row.sl_no}</span>
                     </td>
 
                     {/* Sticky Client Info - Click to Edit */}
@@ -246,7 +254,7 @@ export default function LedgerGrid({
                     {Array.from({ length: totalDays }, (_, i) => i + 1).map(day => {
                       const amount = row.days[day] || 0;
                       const hasValue = amount > 0;
-                      const isToday = day === todayDayNumber;
+                      const isToday = isCurrentMonth && day === todayDayNumber;
                       const colW = dayColWidths[day] || 56;
                       const isRowUnlocked = !!unlockedRows[row.cycle_id];
                       const isCellLocked = isCleared && !isRowUnlocked;
@@ -272,7 +280,7 @@ export default function LedgerGrid({
                             className={`cell-input ${hasValue ? 'cell-has-value' : ''} ${isCellLocked ? 'cell-locked' : ''} ${isCleared && isRowUnlocked ? 'cell-unlocked-editing' : ''}`}
                             value={amount === 0 ? '' : amount}
                             placeholder="-"
-                            title={isCellLocked ? (lang === 'ta' ? 'கடன் நிறைவடைந்தது (பூட்டப்பட்டுள்ளது). திருத்த வலதுபுறம் பூட்டை திறக்க.' : 'Loan cleared (locked). Click Unlock icon to edit.') : undefined}
+                            title={isCellLocked ? (lang === 'ta' ? 'தவணை நிறைவடைந்தது (பூட்டப்பட்டுள்ளது). திருத்த வலதுபுறம் பூட்டை திறக்க.' : 'Thavanai cleared (locked). Click Unlock icon to edit.') : undefined}
                             onFocus={(e) => !isCellLocked && e.target.select()}
                             onKeyDown={(e) => !isCellLocked && handleKeyDown(e, rIdx, day)}
                             onChange={(e) => !isCellLocked && onCellChange(row.cycle_id, row.client_id, day, e.target.value)}
@@ -330,7 +338,13 @@ export default function LedgerGrid({
                         {/* WhatsApp Receipt Button */}
                         <button
                           type="button"
-                          onClick={() => onOpenReceipt({ ...row, current_payment: row.days?.[todayDayNumber] || 0, selected_day: todayDayNumber }, 'whatsapp')}
+                          onClick={() => onOpenReceipt({
+                            ...row,
+                            month_year: gridData?.month_year,
+                            start_date: row.start_date || `${gridData?.month_year}-01`,
+                            current_payment: row.days?.[activeReceiptDay] || 0,
+                            selected_day: activeReceiptDay
+                          }, 'whatsapp')}
                           className="btn-icon"
                           style={{ padding: '4px', color: '#25D366' }}
                           title={t('btn_whatsapp')}
@@ -341,7 +355,13 @@ export default function LedgerGrid({
                         {/* Thermal Print Slip Button */}
                         <button
                           type="button"
-                          onClick={() => onOpenReceipt({ ...row, current_payment: row.days?.[todayDayNumber] || 0, selected_day: todayDayNumber }, 'print')}
+                          onClick={() => onOpenReceipt({
+                            ...row,
+                            month_year: gridData?.month_year,
+                            start_date: row.start_date || `${gridData?.month_year}-01`,
+                            current_payment: row.days?.[activeReceiptDay] || 0,
+                            selected_day: activeReceiptDay
+                          }, 'print')}
                           className="btn-icon"
                           style={{ padding: '4px' }}
                           title={t('btn_print')}

@@ -21,15 +21,15 @@ describe('Receipt Data Structure & Minimal Clean Presentation Verification', () 
       format: 'detailed'
     });
 
-    assert.ok(slip.includes('ALR ஃபைனான்ஸ் — தினசரி வசூல் ரசீது'), 'Must have Tamil shop title');
-    assert.ok(slip.includes('வாடிக்கையாளர்: செல்வி (#12)'), 'Must contain client name and serial number');
+    assert.ok(slip.includes('ALR ஃபைனான்ஸ் — தினசரி தவணை வரவு ரசீது'), 'Must have Tamil shop title');
+    assert.ok(slip.includes('வாடிக்கையாளர்: செல்வி (12)'), 'Must contain client name and serial number');
     assert.ok(slip.includes('தொலைபேசி: 9876543210'), 'Must contain phone');
     assert.ok(slip.includes('முகவரி: மெயின் ரோடு, அலங்காநல்லூர்'), 'Must contain address');
     assert.ok(slip.includes('துவக்க தேதி: 01/09/2026'), 'Must contain loan start date');
-    assert.ok(slip.includes('அசல் கடன்: ₹9,300'), 'Must mention principal');
-    assert.ok(slip.includes('இதுவரை வசூல்: ₹3,000'), 'Must mention total collected so far');
-    assert.ok(slip.includes('இன்று வசூல்: ₹300'), 'Must mention today collection');
-    assert.ok(slip.includes('மீதமுள்ள நிலுவை: ₹6,300'), 'Must mention current remaining balance');
+    assert.ok(slip.includes('தவணை அசல்: ₹9,300'), 'Must mention principal');
+    assert.ok(slip.includes('இதுவரை வரவு: ₹3,000'), 'Must mention total collected so far');
+    assert.ok(slip.includes('இன்று வரவு: ₹300'), 'Must mention today collection');
+    assert.ok(slip.includes('மீதமுள்ள தவணை நிலுவை: ₹6,300'), 'Must mention current remaining balance');
 
     // Verify loan tenure and daily due are NOT in collection receipt
     assert.strictEqual(slip.includes('கடன் தவணைக் காலம்'), false, 'Must NOT contain Loan Tenure in collection receipt');
@@ -53,10 +53,10 @@ describe('Receipt Data Structure & Minimal Clean Presentation Verification', () 
       format: 'detailed'
     });
 
-    assert.ok(slip.includes('ALR Finance — Daily Collection Receipt'), 'Must have English shop title');
-    assert.ok(slip.includes('Client: Selvi (#12)'), 'Must contain client name and serial number');
+    assert.ok(slip.includes('ALR Finance — Daily Thavanai Receipt'), 'Must have English shop title');
+    assert.ok(slip.includes('Client: Selvi (12)'), 'Must contain client name and serial number');
     assert.ok(slip.includes('Start Date: 01/09/2026'), 'Must contain start date');
-    assert.ok(slip.includes('Principal Loan: ₹9,300'), 'Must contain principal loan');
+    assert.ok(slip.includes('Thavanai Principal: ₹9,300'), 'Must contain principal thavanai');
     assert.ok(slip.includes('Total Collected: ₹3,000'), 'Must contain total collected so far');
     assert.ok(slip.includes('Collected Today: ₹300'), 'Must contain today collected amount');
     assert.ok(slip.includes('Remaining Balance: ₹6,300'), 'Must contain remaining balance');
@@ -77,7 +77,7 @@ describe('Receipt Data Structure & Minimal Clean Presentation Verification', () 
     });
     assert.strictEqual(
       conciseTa,
-      'வணக்கம் கார்த்திக், 10/09/2026 வசூல் தொகை: ₹300. மீதமுள்ள நிலுவை: ₹8,700. நன்றி, ALR ஃபைனான்ஸ்.'
+      'வணக்கம் கார்த்திக், 10/09/2026 இன்றைய தவணை வரவு: ₹300. மீதமுள்ள தவணை நிலுவை: ₹8,700. நன்றி, ALR ஃபைனான்ஸ்.'
     );
 
     const conciseEn = formatCollectionReceipt({
@@ -90,7 +90,7 @@ describe('Receipt Data Structure & Minimal Clean Presentation Verification', () 
     });
     assert.strictEqual(
       conciseEn,
-      'Dear Karthik, Collection received on 10/09/2026: ₹300. Remaining balance: ₹8,700. Thank you, ALR Finance.'
+      'Dear Karthik, Thavanai collection on 10/09/2026: ₹300. Remaining balance: ₹8,700. Thank you, ALR Finance.'
     );
   });
 

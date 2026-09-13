@@ -149,8 +149,8 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
                 <AlertTriangle size={16} />
                 <span>
                   {lang === 'ta'
-                    ? `எச்சரிக்கை: ${duplicateMatch.name} (#${duplicateMatch.sl_no}) ஏற்கனவே இதே தொலைபேசி/பெயருடன் உள்ளார்!`
-                    : `Warning: Borrower already registered: ${duplicateMatch.name} (#${duplicateMatch.sl_no})!`}
+                    ? `எச்சரிக்கை: ${duplicateMatch.name} (${duplicateMatch.sl_no}) ஏற்கனவே இதே தொலைபேசி/பெயருடன் உள்ளார்!`
+                    : `Warning: Borrower already registered: ${duplicateMatch.name} (${duplicateMatch.sl_no})!`}
                 </span>
               </div>
             )}
@@ -223,7 +223,7 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <span style={{ fontSize: '13.5px', fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Banknote size={17} color="var(--emerald-primary)" />
-                  <span>{lang === 'ta' ? 'அசல் கடன் தொகை' : 'Principal Loan Amount'}</span>
+                  <span>{lang === 'ta' ? 'தவணை அசல் தொகை' : 'Thavanai Principal Amount'}</span>
                 </span>
                 <span className="badge badge-indigo font-mono" style={{ fontSize: '11px' }}>
                   {totalDays} {lang === 'ta' ? 'நாட்கள்' : 'Days'}
@@ -233,7 +233,7 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
               {/* Principal Amount Field */}
               <div className="form-group" style={{ marginBottom: '10px' }}>
                 <label className="form-label" style={{ fontWeight: 700 }}>
-                  {lang === 'ta' ? 'அசல் கடன் தொகை (₹) *' : 'Principal Amount (₹) *'}
+                  {lang === 'ta' ? 'தவணை அசல் தொகை (₹) *' : 'Principal Amount (₹) *'}
                 </label>
                 <div style={{ position: 'relative' }}>
                   <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '16px', fontWeight: 800, color: 'var(--emerald-primary)' }}>

@@ -63,48 +63,53 @@ export function formatCollectionReceipt({
 
   // 1. Concise 1-tap WhatsApp message
   if (format === 'concise') {
+    const isZeroPay = Number(amount || 0) === 0;
     if (lang === 'ta') {
-      return `வணக்கம் ${name}, ${date} வசூல் தொகை: ₹${formattedAmount}. மீதமுள்ள நிலுவை: ₹${formattedRemaining}. நன்றி, ${resolvedShopName}.`;
+      return isZeroPay
+        ? `வணக்கம் ${name}, ${date} நிலுவைத் தவணைத் தொகை: ₹${formattedRemaining}. ${resolvedShopName}.`
+        : `வணக்கம் ${name}, ${date} இன்றைய தவணை வரவு: ₹${formattedAmount}. மீதமுள்ள தவணை நிலுவை: ₹${formattedRemaining}. நன்றி, ${resolvedShopName}.`;
     }
-    return `Dear ${name}, Collection received on ${date}: ₹${formattedAmount}. Remaining balance: ₹${formattedRemaining}. Thank you, ${resolvedShopName}.`;
+    return isZeroPay
+      ? `Dear ${name}, Balance due on ${date}: ₹${formattedRemaining}. Kindly pay your daily thavanai. Thank you, ${resolvedShopName}.`
+      : `Dear ${name}, Thavanai collection on ${date}: ₹${formattedAmount}. Remaining balance: ₹${formattedRemaining}. Thank you, ${resolvedShopName}.`;
   }
 
   // 2. Full Thermal POS Slip Format
   if (lang === 'ta') {
-    return `*${resolvedShopName} — தினசரி வசூல் ரசீது*
+    return `*${resolvedShopName} — தினசரி தவணை வரவு ரசீது*
 --------------------------------
-வாடிக்கையாளர்: ${name} (#${sl_no || 1})
+வாடிக்கையாளர்: ${name} (${sl_no || 1})
 தொலைபேசி: ${phone || '-'}
 முகவரி: ${address || '-'}
 ${start_date ? `துவக்க தேதி: ${start_date}\n` : ''}தேதி: ${date}
 
-அசல் கடன்: ₹${formattedPrincipal}
-இதுவரை வசூல்: ₹${formattedTotalCollected}
-இன்று வசூல்: ₹${formattedAmount}
-*மீதமுள்ள நிலுவை: ₹${formattedRemaining}*
+தவணை அசல்: ₹${formattedPrincipal}
+இதுவரை வரவு: ₹${formattedTotalCollected}
+இன்று வரவு: ₹${formattedAmount}
+*மீதமுள்ள தவணை நிலுவை: ₹${formattedRemaining}*
 --------------------------------
-${Number(remaining) === 0 ? '🎉 தங்களின் கடன் முழுமையாக நிறைவுற்றது! நன்றி!' : 'தங்களின் தொடர் ஒத்துழைப்புக்கு நன்றி!'}
+${Number(remaining) === 0 ? '🎉 தங்களின் தவணை கணக்கு முழுமையாக நிறைவுற்றது! நன்றி!' : 'தங்களின் தொடர் ஒத்துழைப்புக்கு நன்றி!'}
 தொடர்புக்கு: ${DEFAULT_SHOP_PHONE}`;
   }
 
-  return `*${resolvedShopName} — Daily Collection Receipt*
+  return `*${resolvedShopName} — Daily Thavanai Receipt*
 --------------------------------
-Client: ${name} (#${sl_no || 1})
+Client: ${name} (${sl_no || 1})
 Phone: ${phone || '-'}
 Address: ${address || '-'}
 ${start_date ? `Start Date: ${start_date}\n` : ''}Date: ${date}
 
-Principal Loan: ₹${formattedPrincipal}
+Thavanai Principal: ₹${formattedPrincipal}
 Total Collected: ₹${formattedTotalCollected}
 Collected Today: ₹${formattedAmount}
 *Remaining Balance: ₹${formattedRemaining}*
 --------------------------------
-${Number(remaining) === 0 ? '🎉 Your loan is fully settled! Thank you!' : 'Thank you for your timely payment!'}
+${Number(remaining) === 0 ? '🎉 Your thavanai account is fully settled! Thank you!' : 'Thank you for your timely payment!'}
 Contact: ${DEFAULT_SHOP_PHONE}`;
 }
 
 /**
- * Format new loan disbursement slip
+ * Format new thavanai disbursement slip
  */
 export function formatDisbursementSlip({
   name,
@@ -123,15 +128,15 @@ export function formatDisbursementSlip({
   const expectedDaily = Math.round(Number(principal || 10000) / tenureDays).toLocaleString('en-IN');
 
   if (lang === 'ta') {
-    return `*${resolvedShopName} — புதிய கடன் அசல் வழங்கல் ரசீது*
+    return `*${resolvedShopName} — புதிய தவணை அசல் வழங்கல் ரசீது*
 --------------------------------
-வாடிக்கையாளர்: ${name} (#${sl_no || 1})
+வாடிக்கையாளர்: ${name} (${sl_no || 1})
 தொலைபேசி: ${phone || '-'}
 முகவரி: ${address || '-'}
 தேதி: ${date}
 
-வழங்கப்பட்ட அசல் கடன்: ₹${formattedPrincipal}
-கடன் தவணைக் காலம்: ${tenureDays} நாட்கள்
+வழங்கப்பட்ட தவணை அசல்: ₹${formattedPrincipal}
+தவணைக் காலம்: ${tenureDays} நாட்கள்
 எதிர்பார்க்கப்படும் தவணை/நாள்: ₹${expectedDaily} / நாள்
 --------------------------------
 தவணை கணக்கு வெற்றிகரமாக துவங்கப்பட்டது.
@@ -139,15 +144,15 @@ export function formatDisbursementSlip({
 தொடர்புக்கு: ${DEFAULT_SHOP_PHONE}`;
   }
 
-  return `*${resolvedShopName} — New Loan Disbursement Slip*
+  return `*${resolvedShopName} — New Thavanai Disbursement Slip*
 --------------------------------
-Client: ${name} (#${sl_no || 1})
+Client: ${name} (${sl_no || 1})
 Phone: ${phone || '-'}
 Address: ${address || '-'}
 Date: ${date}
 
-Principal Disbursed: ₹${formattedPrincipal}
-Loan Tenure: ${tenureDays} Days
+Thavanai Principal: ₹${formattedPrincipal}
+Thavanai Tenure: ${tenureDays} Days
 Expected Daily Due: ₹${expectedDaily} / day
 --------------------------------
 Thavanai account activated successfully.

@@ -1,12 +1,12 @@
 {
   "app_name": "ALR ஃபைனான்ஸ்",
-  "app_tagline": "தினசரி வசூல் மற்றும் கடன் மீட்பு மேலாண்மை",
+  "app_tagline": "தினசரி தவணை வசூல் மேலாண்மை",
   "shop_subtitle": "ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ் • அலங்காநல்லூர்",
   
   "nav_collection": "தினசரி வசூல்",
   "nav_dashboard": "முகப்பு பலகை",
   "nav_clients": "வாடிக்கையாளர்கள்",
-  "nav_closed": "நிறைவுற்ற கடன்கள்",
+  "nav_closed": "நிறைவுற்ற தவணைகள்",
   "nav_excel": "எக்செல் மேலாண்மை",
   "nav_settings": "அமைப்புகள்",
   
@@ -94,8 +94,8 @@
   
   "rollover_wizard_title": "மாதாந்திர மாற்றம் (Month-End Rollover Wizard)",
   "rollover_analyzing": "கணக்குகளை சரிபார்க்கிறது...",
-  "rollover_step1_title": "நிறைவுற்ற கடன்கள் (காப்பகப்படுத்தப்படும்)",
-  "rollover_step2_title": "அடுத்த மாதத்திற்கு தொடரும் கடன்கள்",
+  "rollover_step1_title": "நிறைவுற்ற தவணைகள் (காப்பகப்படுத்தப்படும்)",
+  "rollover_step2_title": "அடுத்த மாதத்திற்கு தொடரும் தவணைகள்",
   "rollover_confirm_btn": "அடுத்த மாத பதிவேட்டை உருவாக்கு (1-Click Rollover)",
   
   "shop_profile_title": "ஃபைனான்ஸ் நிறுவன விவரங்கள் (Shop Profile)",

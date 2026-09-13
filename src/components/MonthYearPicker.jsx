@@ -2,20 +2,20 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { Calendar, ChevronLeft, ChevronRight, Check, Sparkles, Clock, X } from 'lucide-react';
 
-// Tamil Month Map
+// Tamil Month Map (Standard Gregorian Tamil names for register clarity)
 const TAMIL_MONTHS = {
-  1: 'தை',
-  2: 'மாசி',
-  3: 'பங்குனி',
-  4: 'சித்திரை',
-  5: 'வைகாசி',
-  6: 'ஆனி',
-  7: 'ஆடி',
-  8: 'ஆவணி',
-  9: 'புரட்டாசி',
-  10: 'ஐப்பசி',
-  11: 'கார்த்திகை',
-  12: 'மார்கழி'
+  1: 'ஜனவரி',
+  2: 'பிப்ரவரி',
+  3: 'மார்ச்',
+  4: 'ஏப்ரல்',
+  5: 'மே',
+  6: 'ஜூன்',
+  7: 'ஜூலை',
+  8: 'ஆகஸ்ட்',
+  9: 'செப்டம்பர்',
+  10: 'அக்டோபர்',
+  11: 'நவம்பர்',
+  12: 'டிசம்பர்'
 };
 
 const ENGLISH_MONTHS = [

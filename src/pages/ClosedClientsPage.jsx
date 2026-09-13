@@ -66,7 +66,7 @@ export default function ClosedClientsPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Archive size={22} color="var(--emerald-primary)" />
           <h2 style={{ fontSize: '18px', fontWeight: 800 }}>
-            {lang === 'ta' ? 'நிறைவுற்ற கடன்கள் காப்பகம் (Closed Loans Archive)' : 'Closed Loans Archive'}
+            {lang === 'ta' ? 'நிறைவுற்ற தவணைகள் காப்பகம் (Closed Thavanai Archive)' : 'Closed Thavanai Archive'}
           </h2>
           <span className="badge badge-emerald font-mono">{closedList.length}</span>
         </div>
@@ -109,7 +109,7 @@ export default function ClosedClientsPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-                    {lang === 'ta' ? 'நிறைவுற்ற கடன்கள் ஏதுமில்லை' : 'No closed loans in archive yet'}
+                    {lang === 'ta' ? 'நிறைவுற்ற தவணைகள் ஏதுமில்லை' : 'No closed thavanai in archive yet'}
                   </td>
                 </tr>
               ) : (
