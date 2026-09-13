@@ -78,7 +78,8 @@ export function formatCollectionReceipt({
   if (lang === 'ta') {
     return `*${resolvedShopName} — தினசரி தவணை வரவு ரசீது*
 --------------------------------
-வாடிக்கையாளர்: ${name} (${sl_no || 1})
+வ.எண்: ${sl_no || 1}
+வாடிக்கையாளர்: ${name}
 தொலைபேசி: ${phone || '-'}
 முகவரி: ${address || '-'}
 ${start_date ? `துவக்க தேதி: ${start_date}\n` : ''}தேதி: ${date}
@@ -94,7 +95,8 @@ ${Number(remaining) === 0 ? '🎉 தங்களின் தவணை கண�
 
   return `*${resolvedShopName} — Daily Thavanai Receipt*
 --------------------------------
-Client: ${name} (${sl_no || 1})
+S.No: ${sl_no || 1}
+Client: ${name}
 Phone: ${phone || '-'}
 Address: ${address || '-'}
 ${start_date ? `Start Date: ${start_date}\n` : ''}Date: ${date}
@@ -118,26 +120,22 @@ export function formatDisbursementSlip({
   address = '',
   date = new Date().toLocaleDateString('en-GB'),
   principal = 10000,
-  total_days = 31,
   shopName,
   lang = 'ta'
 }) {
   const resolvedShopName = shopName || (lang === 'ta' ? DEFAULT_SHOP_NAME_TA : DEFAULT_SHOP_NAME_EN);
   const formattedPrincipal = Number(principal || 10000).toLocaleString('en-IN');
-  const tenureDays = Number(total_days || 31);
-  const expectedDaily = Math.round(Number(principal || 10000) / tenureDays).toLocaleString('en-IN');
 
   if (lang === 'ta') {
     return `*${resolvedShopName} — புதிய தவணை அசல் வழங்கல் ரசீது*
 --------------------------------
-வாடிக்கையாளர்: ${name} (${sl_no || 1})
+வ.எண்: ${sl_no || 1}
+வாடிக்கையாளர்: ${name}
 தொலைபேசி: ${phone || '-'}
 முகவரி: ${address || '-'}
-தேதி: ${date}
+துவக்க தேதி: ${date}
 
 வழங்கப்பட்ட தவணை அசல்: ₹${formattedPrincipal}
-தவணைக் காலம்: ${tenureDays} நாட்கள்
-எதிர்பார்க்கப்படும் தவணை/நாள்: ₹${expectedDaily} / நாள்
 --------------------------------
 தவணை கணக்கு வெற்றிகரமாக துவங்கப்பட்டது.
 தங்களின் தொடர் ஒத்துழைப்புக்கு நன்றி!
@@ -146,14 +144,13 @@ export function formatDisbursementSlip({
 
   return `*${resolvedShopName} — New Thavanai Disbursement Slip*
 --------------------------------
-Client: ${name} (${sl_no || 1})
+S.No: ${sl_no || 1}
+Client: ${name}
 Phone: ${phone || '-'}
 Address: ${address || '-'}
-Date: ${date}
+Start Date: ${date}
 
 Thavanai Principal: ₹${formattedPrincipal}
-Thavanai Tenure: ${tenureDays} Days
-Expected Daily Due: ₹${expectedDaily} / day
 --------------------------------
 Thavanai account activated successfully.
 Thank you for choosing us!

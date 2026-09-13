@@ -126,7 +126,8 @@ export default function ReceiptModal({ client, totalDays: propTotalDays, mode = 
      ${shopName}
   தினசரி தவணை வரவு ரசீது
 ================================
-வாடிக்கையாளர்  : ${client.name} (${client.sl_no || 1})
+வ.எண்          : ${client.sl_no || 1}
+வாடிக்கையாளர்  : ${client.name}
 தொலைபேசி எண்   : ${client.phone || '-'}
 முகவரி        : ${client.address || '-'}
 தவணை துவக்கம்  : ${startDate}
@@ -146,7 +147,8 @@ ${shopAddress}`;
      ${shopName}
     Daily Thavanai Receipt
 ================================
-Client Name    : ${client.name} (${client.sl_no || 1})
+S.No           : ${client.sl_no || 1}
+Client Name    : ${client.name}
 Phone Number   : ${client.phone || '-'}
 Address        : ${client.address || '-'}
 Start Date     : ${startDate}
@@ -168,7 +170,8 @@ ${shopAddress}`;
 ━━━━━━━━━━━━━━━━━━
 வணக்கம் *${client.name}* அவர்களே,
 📅 தேதி          : ${receiptDate}
-📋 தவணை கணக்கு எண்: ${client.sl_no || 1}
+📋 வ.எண்         : ${client.sl_no || 1}
+👤 பெயர்          : ${client.name}
 📞 தொலைபேசி எண்  : ${client.phone || '-'}
 📍 முகவரி        : ${client.address || '-'}
 🗓️ தவணை துவக்கம்  : ${startDate}
@@ -186,7 +189,8 @@ ${liveRemaining === 0 ? '🎉 தங்களின் தவணை கணக்
 ━━━━━━━━━━━━━━━━━━
 Dear *${client.name}*,
 📅 Date           : ${receiptDate}
-📋 Thavanai A/C No: ${client.sl_no || 1}
+📋 S.No           : ${client.sl_no || 1}
+👤 Client Name    : ${client.name}
 📞 Phone Number   : ${client.phone || '-'}
 📍 Address        : ${client.address || '-'}
 🗓️ Start Date     : ${startDate}
@@ -204,14 +208,13 @@ ${liveRemaining === 0 ? '🎉 Your thavanai account is fully settled! Thank you!
      ${shopName}
   புதிய தவணை அசல் வழங்கல் ரசீது
 ================================
-வாடிக்கையாளர்  : ${client.name} (${client.sl_no || 1})
+வ.எண்          : ${client.sl_no || 1}
+வாடிக்கையாளர்  : ${client.name}
 தொலைபேசி எண்   : ${client.phone || '-'}
 முகவரி        : ${client.address || '-'}
 துவக்க தேதி   : ${startDate}
-தேதி          : ${receiptDate}
 --------------------------------
 வழங்கப்பட்ட தவணை அசல்: ₹${principal.toLocaleString('en-IN')}
-தவணை காலம்         : ${totalDays} நாட்கள்
 --------------------------------
 தவணை கணக்கு வெற்றிகரமாக துவங்கப்பட்டது.
 தங்களின் தொடர் ஒத்துழைப்புக்கு நன்றி!
@@ -222,14 +225,13 @@ ${liveRemaining === 0 ? '🎉 Your thavanai account is fully settled! Thank you!
      ${shopName}
   New Thavanai Disbursement Slip
 ================================
-Client Name        : ${client.name} (${client.sl_no || 1})
+S.No               : ${client.sl_no || 1}
+Client Name        : ${client.name}
 Phone Number       : ${client.phone || '-'}
 Address            : ${client.address || '-'}
 Start Date         : ${startDate}
-Date               : ${receiptDate}
 --------------------------------
 Thavanai Principal : ₹${principal.toLocaleString('en-IN')}
-Thavanai Tenure    : ${totalDays} Days
 --------------------------------
 Thavanai account activated successfully.
 Thank you for choosing us!
@@ -547,7 +549,7 @@ Contact: ${shopPhone}
                   <User size={15} color="var(--indigo-primary)" />
                   <span style={{ fontWeight: 800 }}>{client.name}</span>
                   <span className="badge badge-indigo" style={{ fontSize: '11px', padding: '1px 6px' }}>
-                    {client.sl_no || 1}
+                    {receiptLang === 'ta' ? `வ.எண்: ${client.sl_no || 1}` : `S.No: ${client.sl_no || 1}`}
                   </span>
                 </div>
                 <div className="summary-meta-row">

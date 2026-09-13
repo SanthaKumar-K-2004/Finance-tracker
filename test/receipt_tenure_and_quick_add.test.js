@@ -22,7 +22,8 @@ describe('Receipt Data Structure & Minimal Clean Presentation Verification', () 
     });
 
     assert.ok(slip.includes('ALR ஃபைனான்ஸ் — தினசரி தவணை வரவு ரசீது'), 'Must have Tamil shop title');
-    assert.ok(slip.includes('வாடிக்கையாளர்: செல்வி (12)'), 'Must contain client name and serial number');
+    assert.ok(slip.includes('வ.எண்: 12'), 'Must contain serial number');
+    assert.ok(slip.includes('வாடிக்கையாளர்: செல்வி'), 'Must contain client name');
     assert.ok(slip.includes('தொலைபேசி: 9876543210'), 'Must contain phone');
     assert.ok(slip.includes('முகவரி: மெயின் ரோடு, அலங்காநல்லூர்'), 'Must contain address');
     assert.ok(slip.includes('துவக்க தேதி: 01/09/2026'), 'Must contain loan start date');
@@ -54,7 +55,8 @@ describe('Receipt Data Structure & Minimal Clean Presentation Verification', () 
     });
 
     assert.ok(slip.includes('ALR Finance — Daily Thavanai Receipt'), 'Must have English shop title');
-    assert.ok(slip.includes('Client: Selvi (12)'), 'Must contain client name and serial number');
+    assert.ok(slip.includes('S.No: 12'), 'Must contain serial number');
+    assert.ok(slip.includes('Client: Selvi'), 'Must contain client name');
     assert.ok(slip.includes('Start Date: 01/09/2026'), 'Must contain start date');
     assert.ok(slip.includes('Thavanai Principal: ₹9,300'), 'Must contain principal thavanai');
     assert.ok(slip.includes('Total Collected: ₹3,000'), 'Must contain total collected so far');

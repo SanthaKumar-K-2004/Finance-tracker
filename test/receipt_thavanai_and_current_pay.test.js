@@ -63,7 +63,8 @@ describe('Receipt Current Payment, Remaining Balance & Thavanai Terminology Veri
 ━━━━━━━━━━━━━━━━━━
 வணக்கம் *${client.name}* அவர்களே,
 📅 தேதி          : ${today}
-📋 தவணை கணக்கு எண்: #${client.sl_no || 1}
+📋 வ.எண்         : ${client.sl_no || 1}
+👤 பெயர்          : ${client.name}
 📞 தொலைபேசி எண்  : ${client.phone || '-'}
 📍 முகவரி        : ${client.address || '-'}
 🗓️ தவணை துவக்கம்  : ${startDate}
@@ -79,7 +80,8 @@ ${liveRemaining === 0 ? '🎉 தங்களின் தவணை கணக்
     assert.ok(detailedWaTa.includes('ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ்'), 'Contains shop name');
     assert.ok(detailedWaTa.includes('இன்றைய வரவு    : *₹300*'), 'Clearly indicates current payment');
     assert.ok(detailedWaTa.includes('மீதமுள்ள தவணை நிலுவை: ₹6,700'), 'Clearly indicates remaining balance');
-    assert.ok(detailedWaTa.includes('தவணை கணக்கு எண்: #12'), 'Uses thavanai account number');
+    assert.ok(detailedWaTa.includes('வ.எண்         : 12'), 'Uses separate serial number');
+    assert.ok(detailedWaTa.includes('பெயர்          : செல்வி'), 'Uses separate client name');
     assert.ok(detailedWaTa.includes('தவணை அசல்     : ₹10,000'), 'Uses thavanai principal');
     assert.ok(detailedWaTa.includes('இதுவரை வரவு   : ₹3,300'), 'Uses total collected');
 
@@ -101,6 +103,9 @@ ${liveRemaining === 0 ? '🎉 தங்களின் தவணை கணக்
 
     assert.ok(disbursementSlip.includes('தவணை கணக்கு வெற்றிகரமாக துவங்கப்பட்டது'), 'Must mention thavanai account activation');
     assert.strictEqual(disbursementSlip.includes('கடன் கணக்கு வெற்றிகரமாக துவங்கப்பட்டது'), false, 'Must NOT use loan account');
+    assert.ok(disbursementSlip.includes('துவக்க தேதி:'), 'Must mention starting date');
+    assert.ok(disbursementSlip.includes('வ.எண்: 1'), 'Must have separate S.No');
+    assert.ok(disbursementSlip.includes('வாடிக்கையாளர்: செல்வி'), 'Must have separate client name');
 
     const enDisbursementSlip = formatDisbursementSlip({
       name: 'Selvi',
@@ -112,6 +117,9 @@ ${liveRemaining === 0 ? '🎉 தங்களின் தவணை கணக்
     });
     assert.ok(enDisbursementSlip.includes('Thavanai account activated successfully'), 'Must mention thavanai account in English');
     assert.strictEqual(enDisbursementSlip.includes('Loan account activated successfully'), false, 'Must NOT use loan account in English');
+    assert.ok(enDisbursementSlip.includes('Start Date:'), 'Must mention start date in English');
+    assert.ok(enDisbursementSlip.includes('S.No: 1'), 'Must have separate S.No in English');
+    assert.ok(enDisbursementSlip.includes('Client: Selvi'), 'Must have separate client name in English');
   });
 
   it('4. Zero remaining triggers settlement celebration and marks thavanai complete', () => {

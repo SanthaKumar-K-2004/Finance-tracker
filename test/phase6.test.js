@@ -70,10 +70,11 @@ describe('Phase 6: Excel Template Engine, WhatsApp Receipts & Verification', () 
       assert.ok(detailedSlip.includes('தவணை அசல்: ₹10,000'));
       assert.ok(detailedSlip.includes('இன்று வரவு: ₹350'));
       assert.ok(detailedSlip.includes('மீதமுள்ள தவணை நிலுவை: ₹8,650'));
-      assert.ok(detailedSlip.includes('வாடிக்கையாளர்: கார்த்திக் (1)'));
+      assert.ok(detailedSlip.includes('வ.எண்: 1'));
+      assert.ok(detailedSlip.includes('வாடிக்கையாளர்: கார்த்திக்'));
     });
 
-    it('should format new loan disbursement slips', () => {
+    it('should format new loan disbursement slips without tenure duration and separate S.No', () => {
       const slip = formatDisbursementSlip({
         name: 'முருகன்',
         phone: '9876543211',
@@ -85,8 +86,11 @@ describe('Phase 6: Excel Template Engine, WhatsApp Receipts & Verification', () 
       });
       assert.ok(slip.includes('புதிய தவணை அசல் வழங்கல் ரசீது'));
       assert.ok(slip.includes('வழங்கப்பட்ட தவணை அசல்: ₹10,000'));
-      assert.ok(slip.includes('தவணைக் காலம்: 31 நாட்கள்'));
-      assert.ok(slip.includes('வாடிக்கையாளர்: முருகன் (5)'));
+      assert.ok(slip.includes('துவக்க தேதி: 09/09/2026'), 'Must mention starting date');
+      assert.strictEqual(slip.includes('தவணைக் காலம்'), false, 'Must NOT contain tenure duration');
+      assert.strictEqual(slip.includes('31 நாட்கள்'), false, 'Must NOT mention 31 days in disbursement slip');
+      assert.ok(slip.includes('வ.எண்: 5'));
+      assert.ok(slip.includes('வாடிக்கையாளர்: முருகன்'));
     });
   });
 
