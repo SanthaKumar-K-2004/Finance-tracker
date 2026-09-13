@@ -330,7 +330,7 @@ export default function LedgerGrid({
                         {/* WhatsApp Receipt Button */}
                         <button
                           type="button"
-                          onClick={() => onOpenReceipt(row, 'whatsapp')}
+                          onClick={() => onOpenReceipt({ ...row, current_payment: row.days?.[todayDayNumber] || 0, selected_day: todayDayNumber }, 'whatsapp')}
                           className="btn-icon"
                           style={{ padding: '4px', color: '#25D366' }}
                           title={t('btn_whatsapp')}
@@ -341,7 +341,7 @@ export default function LedgerGrid({
                         {/* Thermal Print Slip Button */}
                         <button
                           type="button"
-                          onClick={() => onOpenReceipt(row, 'print')}
+                          onClick={() => onOpenReceipt({ ...row, current_payment: row.days?.[todayDayNumber] || 0, selected_day: todayDayNumber }, 'print')}
                           className="btn-icon"
                           style={{ padding: '4px' }}
                           title={t('btn_print')}

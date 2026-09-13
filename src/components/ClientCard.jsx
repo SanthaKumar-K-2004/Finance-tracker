@@ -339,7 +339,7 @@ export default function ClientCard({
       <div className="card-actions-row">
         <button
           type="button"
-          onClick={() => onOpenReceipt(client, 'whatsapp')}
+          onClick={() => onOpenReceipt({ ...client, current_payment: todayAmount, selected_day: todayDay }, 'whatsapp')}
           className="btn btn-secondary btn-sm"
           style={{ flex: 1, borderColor: '#25D366', color: '#16A34A', height: '36px', fontWeight: 700 }}
         >
@@ -349,7 +349,7 @@ export default function ClientCard({
 
         <button
           type="button"
-          onClick={() => onOpenReceipt(client, 'print')}
+          onClick={() => onOpenReceipt({ ...client, current_payment: todayAmount, selected_day: todayDay }, 'print')}
           className="btn btn-secondary btn-sm"
           style={{ height: '36px', padding: '0 10px' }}
           title={t('btn_print')}

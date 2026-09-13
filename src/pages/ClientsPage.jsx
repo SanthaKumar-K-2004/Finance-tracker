@@ -220,7 +220,7 @@ export default function ClientsPage({ activeMonth }) {
                           }}
                           className="btn-icon"
                           style={{ padding: '4px', color: 'var(--indigo-primary)' }}
-                          title={lang === 'ta' ? 'அசல் கடன் சீட்டு (Loan Slip)' : 'New Loan Slip'}
+                          title={lang === 'ta' ? 'அசல் தவணை சீட்டு (Thavanai Slip)' : 'New Thavanai Slip'}
                         >
                           <FileText size={14} />
                         </button>
@@ -362,7 +362,7 @@ export default function ClientsPage({ activeMonth }) {
                     }}
                     className="btn btn-secondary btn-sm"
                     style={{ height: '32px', padding: '0 8px', fontSize: '11px', color: 'var(--indigo-primary)' }}
-                    title={lang === 'ta' ? 'அசல் கடன் சீட்டு (Loan Slip)' : 'New Loan Slip'}
+                    title={lang === 'ta' ? 'அசல் தவணை சீட்டு (Thavanai Slip)' : 'New Thavanai Slip'}
                   >
                     <FileText size={12} />
                     <span>{lang === 'ta' ? 'சீட்டு' : 'Slip'}</span>

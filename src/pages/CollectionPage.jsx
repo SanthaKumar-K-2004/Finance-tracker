@@ -821,7 +821,7 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
             {/* Principal Amount Range Filter */}
             <div>
               <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
-                {lang === 'ta' ? 'அசல் கடன் வரம்பு:' : 'Principal Range:'}
+                {lang === 'ta' ? 'தவணை அசல் வரம்பு:' : 'Thavanai Principal Range:'}
               </label>
               <select
                 className="form-select"
@@ -870,7 +870,15 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
           gridData={{ ...gridData, total_days: totalDays, rows: filteredRows }}
           totalDays={totalDays}
           onCellChange={handleCellChange}
-          onOpenReceipt={(client, mode) => setSelectedReceipt({ client: { ...client, total_days: totalDays }, mode })}
+          onOpenReceipt={(client, mode) => setSelectedReceipt({
+            client: {
+              ...client,
+              total_days: totalDays,
+              selected_day: client.selected_day || cardDay,
+              current_payment: client.current_payment !== undefined ? client.current_payment : (client.days?.[cardDay] || 0)
+            },
+            mode
+          })}
           onCloseClient={handleCloseClient}
           onEditClient={handleEditClient}
           onDeleteClient={handleDeleteClient}
@@ -953,7 +961,15 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
                   todayDay={cardDay}
                   onQuickPay={handleQuickPay}
                   onOpenModal={(c) => setSelectedClientForModal({ ...c, total_days: totalDays })}
-                  onOpenReceipt={(c, mode) => setSelectedReceipt({ client: { ...c, total_days: totalDays }, mode })}
+                  onOpenReceipt={(c, mode) => setSelectedReceipt({
+                    client: {
+                      ...c,
+                      total_days: totalDays,
+                      selected_day: c.selected_day || cardDay,
+                      current_payment: c.current_payment !== undefined ? c.current_payment : (c.days?.[cardDay] || 0)
+                    },
+                    mode
+                  })}
                   onCloseClient={handleCloseClient}
                   onEditClient={handleEditClient}
                   onDeleteClient={handleDeleteClient}

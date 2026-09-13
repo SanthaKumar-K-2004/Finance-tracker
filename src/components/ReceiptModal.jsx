@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useCompany } from '../context/CompanyContext';
 import { 
@@ -16,21 +16,47 @@ import {
   MapPin, 
   Clock,
   Bluetooth,
-  BluetoothConnected
+  BluetoothConnected,
+  RotateCcw,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { printViaBluetooth, isBluetoothSupported } from '../utils/bluetoothPrinter';
 
 export default function ReceiptModal({ client, totalDays: propTotalDays, mode = 'whatsapp', initialType = 'collection', onClose }) {
   const { lang: appLang } = useLanguage();
+  const { company } = useCompany();
+
   const [copied, setCopied] = useState(false);
   const [receiptType, setReceiptType] = useState(initialType); // 'collection' | 'disbursement'
-  const [receiptLang, setReceiptLang] = useState(appLang || 'ta'); // 'ta' | 'en'
+  const [receiptLang, setReceiptLang] = useState('ta'); // Tamil first by default as requested
   const [btState, setBtState] = useState({ loading: false, message: '', error: '' });
-
-  const [receiptFormat, setReceiptFormat] = useState('concise'); // 'concise' | 'detailed'
+  const [receiptFormat, setReceiptFormat] = useState('detailed'); // 'detailed' | 'concise'
   const [rollSize, setRollSize] = useState('80mm'); // '80mm' | '58mm'
 
-  const { company } = useCompany();
+  // Extract initial payment amount from props
+  const getInitialPayment = (c) => {
+    if (c.current_payment !== undefined && c.current_payment !== null) {
+      return Number(c.current_payment);
+    }
+    if (c.days && c.selected_day && c.days[c.selected_day] !== undefined) {
+      return Number(c.days[c.selected_day] || 0);
+    }
+    if (c.today_paid !== undefined && c.today_paid !== null) {
+      return Number(c.today_paid);
+    }
+    if (c.last_paid_amount !== undefined && c.last_paid_amount !== null) {
+      return Number(c.last_paid_amount);
+    }
+    return 0;
+  };
+
+  const [paymentAmount, setPaymentAmount] = useState(() => getInitialPayment(client));
+
+  useEffect(() => {
+    setPaymentAmount(getInitialPayment(client));
+  }, [client]);
+
   const totalDays = propTotalDays || client.total_days || 31;
   const today = new Date().toLocaleDateString('en-GB');
   const shopName = company?.name || (receiptLang === 'ta' ? 'ALR ஃபைனான்ஸ்' : 'ALR Finance');
@@ -38,114 +64,140 @@ export default function ReceiptModal({ client, totalDays: propTotalDays, mode = 
   const shopAddress = company?.address || (receiptLang === 'ta' ? 'அலங்காநல்லூர், மதுரை' : 'Alanganallur, Madurai');
 
   const principal = Number(client.principal || 10000);
-  const expectedDaily = Math.round(principal / totalDays);
-  const collected = Number(client.total_collected || 0);
-  const remaining = client.remaining !== undefined ? Number(client.remaining) : Math.max(0, principal - collected);
-  const todayPaid = Number(client.today_paid || client.last_paid_amount || expectedDaily);
+  const currentPay = Math.max(0, Number(paymentAmount) || 0);
+
+  // Calculate base collected prior to today's entry
+  const recordedDayAmt = (client.days && client.selected_day && client.days[client.selected_day] !== undefined)
+    ? Number(client.days[client.selected_day] || 0)
+    : (client.today_paid !== undefined ? Number(client.today_paid) : 0);
+
+  const baseCollected = Math.max(0, Number(client.total_collected || 0) - recordedDayAmt);
+  const liveTotalCollected = baseCollected + currentPay;
+  const liveRemaining = Math.max(0, principal - liveTotalCollected);
 
   const rawStartDate = client.start_date || (client.month_year ? `${client.month_year}-01` : '');
   const startDate = rawStartDate
     ? (rawStartDate.includes('-') ? rawStartDate.split('-').reverse().join('/') : rawStartDate)
     : today;
 
-  // 1. Concise wa.me 1-Tap Message Templates (Exact Prompt Specification)
-  const conciseTa = `வணக்கம் ${client.name}, ${today} வசூல் தொகை: ₹${todayPaid.toLocaleString('en-IN')}. மீதமுள்ள நிலுவை: ₹${remaining.toLocaleString('en-IN')}. நன்றி, ${shopName}.`;
-  const conciseEn = `Dear ${client.name}, Collection received on ${today}: ₹${todayPaid.toLocaleString('en-IN')}. Remaining balance: ₹${remaining.toLocaleString('en-IN')}. Thank you, ${shopName}.`;
+  // 1. Concise 1-Tap WhatsApp Message Templates
+  const conciseTa = `வணக்கம் ${client.name}, ${today} இன்றைய தவணை வரவு: ₹${currentPay.toLocaleString('en-IN')}. மீதமுள்ள தவணை நிலுவை: ₹${liveRemaining.toLocaleString('en-IN')}. நன்றி, ${shopName}.`;
+  const conciseEn = `Dear ${client.name}, Thavanai collection on ${today}: ₹${currentPay.toLocaleString('en-IN')}. Remaining balance: ₹${liveRemaining.toLocaleString('en-IN')}. Thank you, ${shopName}.`;
 
-  // 2. Daily Collection Receipt Templates (Detailed Thermal Slip)
-  const collectionReceiptTa = `*${shopName} — தினசரி வசூல் ரசீது*
---------------------------------
-வாடிக்கையாளர்  : *${client.name}* (#${client.sl_no || 1})
+  // 2. Full Thermal POS Slip Format (58mm / 80mm Print)
+  const collectionReceiptTa = `================================
+     ${shopName}
+  தினசரி தவணை வரவு ரசீது
+================================
+வாடிக்கையாளர்  : ${client.name} (#${client.sl_no || 1})
 தொலைபேசி எண்   : ${client.phone || '-'}
 முகவரி        : ${client.address || '-'}
-துவக்க தேதி   : ${startDate}
+தவணை துவக்கம்  : ${startDate}
 தேதி          : ${today}
 --------------------------------
-அசல் கடன்     : ₹${principal.toLocaleString('en-IN')}
-இதுவரை வசூல்  : ₹${collected.toLocaleString('en-IN')}
-இன்று வசூல்    : ₹${todayPaid.toLocaleString('en-IN')}
-*மீதமுள்ள நிலுவை: ₹${remaining.toLocaleString('en-IN')}*
+தவணை அசல்     : ₹${principal.toLocaleString('en-IN')}
+இன்றைய வரவு    : ₹${currentPay.toLocaleString('en-IN')}
+இதுவரை வரவு    : ₹${liveTotalCollected.toLocaleString('en-IN')}
 --------------------------------
-${remaining === 0 ? '🎉 தங்களின் கடன் முழுமையாக நிறைவுற்றது! நன்றி!' : 'தங்களின் தொடர் ஒத்துழைப்புக்கு நன்றி!'}
-தொடர்புக்கு: ${shopPhone} (${shopAddress})`;
+*மீதமுள்ள தவணை நிலுவை: ₹${liveRemaining.toLocaleString('en-IN')}*
+================================
+${liveRemaining === 0 ? '🎉 தங்களின் தவணை கணக்கு நிறைவுற்றது! நன்றி!' : 'தங்களின் தொடர் ஒத்துழைப்புக்கு நன்றி!'}
+தொடர்புக்கு: ${shopPhone}
+${shopAddress}`;
 
-  const collectionReceiptEn = `*${shopName} — Daily Collection Receipt*
---------------------------------
-Client Name    : *${client.name}* (#${client.sl_no || 1})
+  const collectionReceiptEn = `================================
+     ${shopName}
+   Daily Thavanai Receipt
+================================
+Client Name    : ${client.name} (#${client.sl_no || 1})
 Phone Number   : ${client.phone || '-'}
 Address        : ${client.address || '-'}
 Start Date     : ${startDate}
 Date           : ${today}
 --------------------------------
-Principal Loan : ₹${principal.toLocaleString('en-IN')}
-Total Collected: ₹${collected.toLocaleString('en-IN')}
-Collected Today: ₹${todayPaid.toLocaleString('en-IN')}
-*Remaining Balance: ₹${remaining.toLocaleString('en-IN')}*
+Thavanai Principal: ₹${principal.toLocaleString('en-IN')}
+Collected Today   : ₹${currentPay.toLocaleString('en-IN')}
+Total Collected   : ₹${liveTotalCollected.toLocaleString('en-IN')}
 --------------------------------
-${remaining === 0 ? '🎉 Your loan is fully settled! Thank you!' : 'Thank you for your timely payment!'}
-Contact: ${shopPhone} (${shopAddress})`;
+*Remaining Balance: ₹${liveRemaining.toLocaleString('en-IN')}*
+================================
+${liveRemaining === 0 ? '🎉 Your thavanai is fully settled! Thank you!' : 'Thank you for your timely payment!'}
+Contact: ${shopPhone}
+${shopAddress}`;
 
-  // 3. WhatsApp Detailed Message with Clean Bold Structure & Emojis
-  const detailedWaTa = `*${shopName} — தினசரி வசூல் விவரம்* 📋
+  // 3. WhatsApp Detailed Message with Clean Bold Structure, Emojis & Thavanai Terminology
+  const detailedWaTa = `*${shopName}*
+*(தினசரி தவணை வரவு ரசீது)* 📋
 ━━━━━━━━━━━━━━━━━━
-வாடிக்கையாளர்  : *${client.name}* (#${client.sl_no || 1})
-📞 தொலைபேசி எண்: ${client.phone || '-'}
-📍 முகவரி       : ${client.address || '-'}
-🗓️ துவக்க தேதி  : ${startDate}
-📅 தேதி         : ${today}
+வணக்கம் *${client.name}* அவர்களே,
+📅 தேதி          : ${today}
+📋 தவணை கணக்கு எண்: #${client.sl_no || 1}
+📞 தொலைபேசி எண்  : ${client.phone || '-'}
+📍 முகவரி        : ${client.address || '-'}
+🗓️ தவணை துவக்கம்  : ${startDate}
 ──────────────────
-💰 அசல் கடன்     : ₹${principal.toLocaleString('en-IN')}
-📊 இதுவரை வசூலானது: ₹${collected.toLocaleString('en-IN')}
-💵 இன்று செலுத்தியது : *₹${todayPaid.toLocaleString('en-IN')}*
-🔴 *மீதமுள்ள நிலுவை: ₹${remaining.toLocaleString('en-IN')}*
+💰 தவணை அசல்     : ₹${principal.toLocaleString('en-IN')}
+💵 இன்றைய வரவு    : *₹${currentPay.toLocaleString('en-IN')}*
+📊 இதுவரை வரவு   : ₹${liveTotalCollected.toLocaleString('en-IN')}
+🔴 *மீதமுள்ள தவணை நிலுவை: ₹${liveRemaining.toLocaleString('en-IN')}*
 ──────────────────
-${remaining === 0 ? '🎉 தங்களின் கடன் முழுமையாக நிறைவுற்றது! நன்றி!' : 'தங்களின் தொடர் ஒத்துழைப்புக்கு நன்றி!'}
+${liveRemaining === 0 ? '🎉 தங்களின் தவணை கணக்கு முழுமையாக நிறைவுற்றது! வாழ்த்துகள் & நன்றி!' : 'தங்களின் தொடர் ஒத்துழைப்புக்கு மனமார்ந்த நன்றி! 🙏'}
 📞 தொடர்புக்கு: ${shopPhone} (${shopAddress})`;
 
-  const detailedWaEn = `*${shopName} — Daily Collection Details* 📋
+  const detailedWaEn = `*${shopName}*
+*(Daily Thavanai Receipt)* 📋
 ━━━━━━━━━━━━━━━━━━
-Client Name    : *${client.name}* (#${client.sl_no || 1})
-📞 Phone Number: ${client.phone || '-'}
-📍 Address     : ${client.address || '-'}
-🗓️ Start Date  : ${startDate}
-📅 Date        : ${today}
+Dear *${client.name}*,
+📅 Date           : ${today}
+📋 Thavanai A/C No: #${client.sl_no || 1}
+📞 Phone Number   : ${client.phone || '-'}
+📍 Address        : ${client.address || '-'}
+🗓️ Start Date     : ${startDate}
 ──────────────────
-💰 Principal Loan : ₹${principal.toLocaleString('en-IN')}
-📊 Total Collected: ₹${collected.toLocaleString('en-IN')}
-💵 Collected Today: *₹${todayPaid.toLocaleString('en-IN')}*
-🔴 *Remaining Balance: ₹${remaining.toLocaleString('en-IN')}*
+💰 Thavanai Principal: ₹${principal.toLocaleString('en-IN')}
+💵 Collected Today   : *₹${currentPay.toLocaleString('en-IN')}*
+📊 Total Collected   : ₹${liveTotalCollected.toLocaleString('en-IN')}
+🔴 *Remaining Balance: ₹${liveRemaining.toLocaleString('en-IN')}*
 ──────────────────
-${remaining === 0 ? '🎉 Your loan is fully settled! Thank you!' : 'Thank you for your timely payment!'}
+${liveRemaining === 0 ? '🎉 Your thavanai account is fully settled! Thank you!' : 'Thank you for your timely payment! 🙏'}
 📞 Contact: ${shopPhone} (${shopAddress})`;
 
-  // 4. New Client Loan Disbursement Templates
-  const disbursementSlipTa = `*${shopName} — புதிய கடன் அசல் வழங்கல் ரசீது*
+  // 4. New Thavanai Account Disbursement Templates
+  const disbursementSlipTa = `================================
+     ${shopName}
+  புதிய தவணை அசல் வழங்கல் ரசீது
+================================
+வாடிக்கையாளர்  : ${client.name} (#${client.sl_no || 1})
+தொலைபேசி எண்   : ${client.phone || '-'}
+முகவரி        : ${client.address || '-'}
+துவக்க தேதி   : ${startDate}
+தேதி          : ${today}
 --------------------------------
-வாடிக்கையாளர்: ${client.name} (#${client.sl_no || 1})
-தொலைபேசி: ${client.phone || '-'}
-முகவரி: ${client.address || '-'}
-துவக்க தேதி: ${startDate}
-தேதி: ${today}
-
-வழங்கப்பட்ட அசல் கடன்: ₹${principal.toLocaleString('en-IN')}
+வழங்கப்பட்ட தவணை அசல்: ₹${principal.toLocaleString('en-IN')}
+தவணை காலம்         : ${totalDays} நாட்கள்
 --------------------------------
-கடன் கணக்கு வெற்றிகரமாக துவங்கப்பட்டது.
+தவணை கணக்கு வெற்றிகரமாக துவங்கப்பட்டது.
 தங்களின் தொடர் ஒத்துழைப்புக்கு நன்றி!
-தொடர்புக்கு: ${shopPhone}`;
+தொடர்புக்கு: ${shopPhone}
+================================`;
 
-  const disbursementSlipEn = `*${shopName} — New Loan Disbursement Slip*
+  const disbursementSlipEn = `================================
+     ${shopName}
+  New Thavanai Disbursement Slip
+================================
+Client Name        : ${client.name} (#${client.sl_no || 1})
+Phone Number       : ${client.phone || '-'}
+Address            : ${client.address || '-'}
+Start Date         : ${startDate}
+Date               : ${today}
 --------------------------------
-Client: ${client.name} (#${client.sl_no || 1})
-Phone: ${client.phone || '-'}
-Address: ${client.address || '-'}
-Start Date: ${startDate}
-Date: ${today}
-
-Principal Disbursed: ₹${principal.toLocaleString('en-IN')}
+Thavanai Principal : ₹${principal.toLocaleString('en-IN')}
+Thavanai Tenure    : ${totalDays} Days
 --------------------------------
-Loan account activated successfully.
+Thavanai account activated successfully.
 Thank you for choosing us!
-Contact: ${shopPhone}`;
+Contact: ${shopPhone}
+================================`;
 
   // Active receipt text based on toggles
   let activeText = '';
@@ -196,7 +248,7 @@ Contact: ${shopPhone}`;
       body: JSON.stringify({
         client_id: client.id || client.client_id || null,
         phone: cleanPhone,
-        message_type: receiptType === 'disbursement' ? 'loan_slip' : 'collection_receipt',
+        message_type: receiptType === 'disbursement' ? 'thavanai_slip' : 'thavanai_receipt',
         message_text: activeText
       })
     }).catch(() => {});
@@ -204,17 +256,18 @@ Contact: ${shopPhone}`;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+      <div className="modal-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
+        {/* Modal Header */}
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {mode === 'whatsapp' ? <MessageSquare size={18} color="#25D366" /> : <Printer size={18} />}
             <h2 className="modal-title">
               {receiptType === 'disbursement'
-                ? (receiptLang === 'ta' ? 'புதிய கடன் அசல் வழங்கல் ரசீது' : 'New Loan Disbursement Slip')
-                : (receiptLang === 'ta' ? 'வசூல் ரசீது (Collection Receipt)' : 'Daily Collection Receipt')}
+                ? (receiptLang === 'ta' ? 'புதிய தவணை அசல் வழங்கல் ரசீது' : 'New Thavanai Disbursement Slip')
+                : (receiptLang === 'ta' ? 'தவணை வரவு ரசீது (Thavanai Receipt)' : 'Daily Thavanai Receipt')}
             </h2>
           </div>
-          <button type="button" onClick={onClose} className="btn-icon">
+          <button type="button" onClick={onClose} className="btn-icon" title="Close">
             <X size={18} />
           </button>
         </div>
@@ -239,7 +292,7 @@ Contact: ${shopPhone}`;
                   boxShadow: receiptType === 'collection' ? 'var(--shadow-sm)' : 'none'
                 }}
               >
-                {receiptLang === 'ta' ? 'வசூல் ரசீது' : 'Collection'}
+                {receiptLang === 'ta' ? 'தவணை வரவு' : 'Thavanai Receipt'}
               </button>
               <button
                 type="button"
@@ -256,11 +309,11 @@ Contact: ${shopPhone}`;
                   boxShadow: receiptType === 'disbursement' ? 'var(--shadow-sm)' : 'none'
                 }}
               >
-                {receiptLang === 'ta' ? 'அசல் வழங்கல்' : 'New Loan Slip'}
+                {receiptLang === 'ta' ? 'அசல் வழங்கல்' : 'Disbursement'}
               </button>
             </div>
 
-            {/* Language Toggle: Tamil vs English */}
+            {/* Language Toggle: Tamil First vs English */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
               <Globe size={13} color="var(--text-muted)" />
               <div style={{ display: 'flex', background: 'var(--bg-surface-hover)', borderRadius: 'var(--radius-md)', padding: '2px', border: '1px solid var(--border-subtle)' }}>
@@ -307,22 +360,6 @@ Contact: ${shopPhone}`;
                 <span style={{ color: 'var(--text-muted)' }}>{receiptLang === 'ta' ? 'வடிவம்:' : 'Format:'}</span>
                 <button
                   type="button"
-                  onClick={() => setReceiptFormat('concise')}
-                  style={{
-                    padding: '2px 8px',
-                    fontSize: '11px',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid var(--border-subtle)',
-                    cursor: 'pointer',
-                    background: receiptFormat === 'concise' ? 'var(--emerald-light)' : 'transparent',
-                    color: receiptFormat === 'concise' ? 'var(--emerald-text)' : 'var(--text-secondary)',
-                    fontWeight: receiptFormat === 'concise' ? 700 : 400
-                  }}
-                >
-                  {receiptLang === 'ta' ? '1-வரி வாட்ஸ்அப்' : '1-Tap WhatsApp'}
-                </button>
-                <button
-                  type="button"
                   onClick={() => setReceiptFormat('detailed')}
                   style={{
                     padding: '2px 8px',
@@ -335,7 +372,23 @@ Contact: ${shopPhone}`;
                     fontWeight: receiptFormat === 'detailed' ? 700 : 400
                   }}
                 >
-                  {receiptLang === 'ta' ? 'முழு ரசீது' : 'Full Slip'}
+                  {receiptLang === 'ta' ? 'முழு ரசீது (Detailed)' : 'Detailed Slip'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReceiptFormat('concise')}
+                  style={{
+                    padding: '2px 8px',
+                    fontSize: '11px',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--border-subtle)',
+                    cursor: 'pointer',
+                    background: receiptFormat === 'concise' ? 'var(--emerald-light)' : 'transparent',
+                    color: receiptFormat === 'concise' ? 'var(--emerald-text)' : 'var(--text-secondary)',
+                    fontWeight: receiptFormat === 'concise' ? 700 : 400
+                  }}
+                >
+                  {receiptLang === 'ta' ? '1-வரி வாட்ஸ்அப்' : '1-Tap Concise'}
                 </button>
               </div>
             )}
@@ -379,14 +432,86 @@ Contact: ${shopPhone}`;
             </div>
           </div>
 
-          {/* Structured Borrower & Loan Details Card */}
+          {/* Interactive Today's Payment Adjustment Bar */}
+          {receiptType === 'collection' && (
+            <div className="receipt-pay-input-card">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  {receiptLang === 'ta' ? '💵 இன்றைய தவணை வரவு (Current Payment):' : '💵 Today\'s Payment Received:'}
+                </label>
+                <span className="badge badge-emerald font-mono" style={{ fontSize: '13px', fontWeight: 800 }}>
+                  ₹{currentPay.toLocaleString('en-IN')}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: 'var(--text-secondary)' }}>₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    placeholder="0"
+                    className="form-input"
+                    style={{
+                      paddingLeft: '26px',
+                      fontSize: '16px',
+                      fontWeight: 800,
+                      fontFamily: 'var(--font-mono)',
+                      color: 'var(--emerald-primary)',
+                      height: '38px',
+                      width: '100%'
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPaymentAmount(0)}
+                  className="btn btn-secondary btn-sm"
+                  style={{ height: '38px', padding: '0 12px', fontSize: '12px', fontWeight: 700 }}
+                  title={receiptLang === 'ta' ? 'தொகையை 0 ஆக்கு' : 'Reset to 0'}
+                >
+                  <RotateCcw size={13} style={{ marginRight: '4px' }} />
+                  {receiptLang === 'ta' ? '0 ஆக்கு' : 'Reset'}
+                </button>
+              </div>
+
+              {/* Quick +/- Chips */}
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                {[100, 200, 300, 500].map(amt => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setPaymentAmount(prev => (Number(prev) || 0) + amt)}
+                    className="btn btn-secondary btn-sm"
+                    style={{ padding: '3px 8px', fontSize: '11px', fontWeight: 700 }}
+                  >
+                    +{amt}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setPaymentAmount(Math.max(0, principal - baseCollected))}
+                  className="btn btn-secondary btn-sm"
+                  style={{ padding: '3px 10px', fontSize: '11px', fontWeight: 700, borderColor: 'var(--emerald-primary)', color: 'var(--emerald-text)' }}
+                >
+                  {receiptLang === 'ta' ? 'முழு தவணை' : 'Full Due'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Structured Borrower & Thavanai Details Card */}
           <div className="receipt-summary-card">
             <div className="receipt-summary-header">
               <div className="summary-client-info">
                 <div className="summary-client-name">
                   <User size={15} color="var(--indigo-primary)" />
                   <span style={{ fontWeight: 800 }}>{client.name}</span>
-                  <span className="badge badge-indigo" style={{ fontSize: '11px', padding: '1px 6px' }}>#{client.sl_no || 1}</span>
+                  <span className="badge badge-indigo" style={{ fontSize: '11px', padding: '1px 6px' }}>
+                    {receiptLang === 'ta' ? `தவணை எண் #${client.sl_no || 1}` : `Thavanai #${client.sl_no || 1}`}
+                  </span>
                 </div>
                 <div className="summary-meta-row">
                   {client.phone && (
@@ -411,33 +536,45 @@ Contact: ${shopPhone}`;
 
             <div className="receipt-metrics-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
               <div className="receipt-metric-box">
-                <span className="metric-box-label">{receiptLang === 'ta' ? 'அசல் கடன்' : 'Principal'}</span>
+                <span className="metric-box-label">{receiptLang === 'ta' ? 'தவணை அசல்' : 'Thavanai Principal'}</span>
                 <span className="metric-box-val font-mono">₹{principal.toLocaleString('en-IN')}</span>
               </div>
               <div className="receipt-metric-box">
-                <span className="metric-box-label">{receiptLang === 'ta' ? 'இதுவரை வசூல்' : 'Total Collected'}</span>
-                <span className="metric-box-val font-mono" style={{ color: 'var(--emerald-primary)' }}>
-                  ₹{collected.toLocaleString('en-IN')}
+                <span className="metric-box-label">{receiptLang === 'ta' ? 'இன்றைய வரவு' : 'Current Paid'}</span>
+                <span className="metric-box-val font-mono" style={{ color: 'var(--indigo-primary)', fontWeight: 850 }}>
+                  ₹{currentPay.toLocaleString('en-IN')}
                 </span>
               </div>
               <div className="receipt-metric-box">
-                <span className="metric-box-label">{receiptLang === 'ta' ? 'இன்று வசூல்' : 'Today Paid'}</span>
-                <span className="metric-box-val font-mono" style={{ color: 'var(--indigo-primary)' }}>
-                  ₹{todayPaid.toLocaleString('en-IN')}
+                <span className="metric-box-label">{receiptLang === 'ta' ? 'இதுவரை வரவு' : 'Total Collected'}</span>
+                <span className="metric-box-val font-mono" style={{ color: 'var(--emerald-primary)' }}>
+                  ₹{liveTotalCollected.toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
 
-            <div className="receipt-status-strip">
+            <div
+              className="receipt-status-strip"
+              style={{
+                background: liveRemaining === 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.08)',
+                border: `1px solid ${liveRemaining === 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.2)'}`
+              }}
+            >
               <div className="status-strip-item" style={{ width: '100%', justifyContent: 'space-between', padding: '0 8px' }}>
                 <span style={{ fontSize: '13px', fontWeight: 750, color: 'var(--text-secondary)' }}>
-                  {receiptLang === 'ta' ? 'மீதமுள்ள நிலுவை (Balance Due):' : 'Current Remaining Balance:'}
+                  {receiptLang === 'ta' ? 'மீதமுள்ள தவணை நிலுவை (Remaining Balance):' : 'Remaining Thavanai Balance:'}
                 </span>
-                <span className="font-mono" style={{ fontSize: '16px', fontWeight: 800, color: remaining === 0 ? 'var(--emerald-primary)' : 'var(--rose-primary)' }}>
-                  ₹{remaining.toLocaleString('en-IN')}
+                <span className="font-mono" style={{ fontSize: '17px', fontWeight: 850, color: liveRemaining === 0 ? 'var(--emerald-primary)' : 'var(--rose-primary)' }}>
+                  ₹{liveRemaining.toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
+
+            {liveRemaining === 0 && (
+              <div style={{ textAlign: 'center', fontSize: '12px', fontWeight: 750, color: 'var(--emerald-primary)', background: 'rgba(16, 185, 129, 0.1)', padding: '6px', borderRadius: 'var(--radius-sm)' }}>
+                🎉 {receiptLang === 'ta' ? 'தங்களின் தவணை கணக்கு முழுமையாக முடிந்தது! (Fully Settled)' : 'Thavanai fully settled!'}
+              </div>
+            )}
           </div>
 
           {/* Printable 58mm/80mm Thermal Receipt Slip Box */}
@@ -485,6 +622,7 @@ Contact: ${shopPhone}`;
           </p>
         </div>
 
+        {/* Modal Footer Actions */}
         <div className="modal-footer" style={{ flexWrap: 'wrap', gap: '8px' }}>
           <button type="button" onClick={handleCopy} className="btn btn-secondary btn-sm" title="Copy receipt text">
             {copied ? <Check size={15} color="var(--emerald-primary)" /> : <Copy size={15} />}
@@ -504,12 +642,13 @@ Contact: ${shopPhone}`;
             <span>{btState.loading ? (receiptLang === 'ta' ? 'இணைக்கிறது...' : 'Connecting...') : (receiptLang === 'ta' ? 'புளூடூத் POS' : 'Bluetooth POS')}</span>
           </button>
 
-          {/* Standard Browser Print */}
+          {/* Standard Browser / System Print */}
           <button type="button" onClick={handlePrint} className="btn btn-secondary btn-sm" title="Standard browser / local printer print">
             <Printer size={15} />
             <span>{receiptLang === 'ta' ? 'அச்சு (Print)' : 'Print'}</span>
           </button>
 
+          {/* WhatsApp Direct Send Button */}
           {cleanPhone ? (
             <a
               href={whatsappUrl}
@@ -517,10 +656,10 @@ Contact: ${shopPhone}`;
               rel="noopener noreferrer"
               onClick={logWhatsApp}
               className="btn btn-primary btn-sm"
-              style={{ background: '#25D366', borderColor: '#22C55E', color: '#ffffff' }}
+              style={{ background: '#25D366', borderColor: '#22C55E', color: '#ffffff', fontWeight: 700 }}
             >
               <MessageSquare size={16} />
-              <span>{receiptLang === 'ta' ? 'வாட்ஸ்அப்' : 'WhatsApp'}</span>
+              <span>{receiptLang === 'ta' ? 'வாட்ஸ்அப் ரசீது' : 'WhatsApp Receipt'}</span>
               <ExternalLink size={13} />
             </a>
           ) : (

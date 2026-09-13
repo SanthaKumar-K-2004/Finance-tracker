@@ -134,7 +134,7 @@ export function formatDisbursementSlip({
 கடன் தவணைக் காலம்: ${tenureDays} நாட்கள்
 எதிர்பார்க்கப்படும் தவணை/நாள்: ₹${expectedDaily} / நாள்
 --------------------------------
-கடன் கணக்கு வெற்றிகரமாக துவங்கப்பட்டது.
+தவணை கணக்கு வெற்றிகரமாக துவங்கப்பட்டது.
 தங்களின் தொடர் ஒத்துழைப்புக்கு நன்றி!
 தொடர்புக்கு: ${DEFAULT_SHOP_PHONE}`;
   }
@@ -150,7 +150,7 @@ Principal Disbursed: ₹${formattedPrincipal}
 Loan Tenure: ${tenureDays} Days
 Expected Daily Due: ₹${expectedDaily} / day
 --------------------------------
-Loan account activated successfully.
+Thavanai account activated successfully.
 Thank you for choosing us!
 Contact: ${DEFAULT_SHOP_PHONE}`;
 }

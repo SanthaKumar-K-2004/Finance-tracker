@@ -843,7 +843,11 @@ export default function Dashboard({ activeMonth }) {
                       )}
                       <button
                         type="button"
-                        onClick={() => setSelectedReceipt(client)}
+                        onClick={() => setSelectedReceipt({
+                          ...client,
+                          current_payment: client.today_paid || client.today_payment || 0,
+                          selected_day: new Date().getDate()
+                        })}
                         className="btn-icon"
                         style={{ width: '28px', height: '28px', padding: 0, borderRadius: 'var(--radius-sm)', color: '#25D366' }}
                         title="WhatsApp Reminder"
@@ -988,7 +992,11 @@ export default function Dashboard({ activeMonth }) {
                         )}
                         <button
                           type="button"
-                          onClick={() => setSelectedReceipt(def)}
+                          onClick={() => setSelectedReceipt({
+                            ...def,
+                            current_payment: def.today_paid || def.today_payment || 0,
+                            selected_day: new Date().getDate()
+                          })}
                           className="btn-icon"
                           style={{ width: '28px', height: '28px', padding: 0, borderRadius: 'var(--radius-sm)', color: '#25D366' }}
                           title="WhatsApp Reminder"

@@ -182,7 +182,7 @@ export default function ClosedClientsPage() {
                           onClick={() => handleReopen(c)}
                           className="btn btn-secondary btn-sm"
                           style={{ padding: '2px 8px', fontSize: '11px', height: '26px' }}
-                          title={lang === 'ta' ? 'கடனை மீண்டும் திறக்க' : 'Reopen Loan'}
+                          title={lang === 'ta' ? 'தவணையை மீண்டும் திறக்க' : 'Reopen Thavanai'}
                         >
                           <RotateCcw size={12} />
                           <span>{lang === 'ta' ? 'மீட்டெடு' : 'Reopen'}</span>
