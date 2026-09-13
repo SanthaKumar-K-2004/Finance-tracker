@@ -87,22 +87,22 @@ export default function ClientsPage({ activeMonth }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Header & Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <Users size={22} color="var(--emerald-primary)" />
-          <h2 style={{ fontSize: '18px', fontWeight: 800 }}>
-            {lang === 'ta' ? 'வாடிக்கையாளர் பட்டியல் (Borrowers Directory)' : 'Borrowers Directory'}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Users size={20} color="var(--emerald-primary)" />
+          <h2 style={{ fontSize: 'clamp(15px, 4vw, 18px)', fontWeight: 800 }}>
+            {lang === 'ta' ? 'வாடிக்கையாளர் பட்டியல்' : 'Borrowers Directory'}
           </h2>
           <span className="badge badge-indigo font-mono">{clients.length}</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'flex-end' }}>
-          <div style={{ position: 'relative', width: '260px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '240px', justifyContent: 'flex-end' }}>
+          <div style={{ position: 'relative', flex: 1, maxWidth: '280px' }}>
             <Search size={15} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '12px' }} />
             <input
               type="text"
               className="form-input"
-              style={{ paddingLeft: '34px', height: '38px' }}
+              style={{ paddingLeft: '34px', height: '38px', width: '100%' }}
               placeholder={t('search_placeholder')}
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -116,17 +116,18 @@ export default function ClientsPage({ activeMonth }) {
               setShowAddModal(true);
             }}
             className="btn btn-primary"
-            style={{ height: '38px' }}
+            style={{ height: '38px', flexShrink: 0 }}
           >
             <Plus size={16} />
-            <span>{t('btn_add_client')}</span>
+            <span className="desktop-only">{t('btn_add_client')}</span>
+            <span className="mobile-only">{lang === 'ta' ? '+ சேர்க்க' : '+ Add'}</span>
           </button>
         </div>
       </div>
 
-      {/* Directory Table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
+      {/* Directory Table (Desktop View) */}
+      <div className="card desktop-only" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto', width: '100%' }}>
           <table className="ledger-table" style={{ width: '100%' }}>
             <thead>
               <tr>
@@ -285,6 +286,150 @@ export default function ClientsPage({ activeMonth }) {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile Borrower Cards View (< 768px) */}
+      <div className="mobile-only" style={{ flexDirection: 'column', gap: '10px' }}>
+        {loading ? (
+          <div className="card" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+            {lang === 'ta' ? 'ஏற்றுகிறது...' : 'Loading...'}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+            {lang === 'ta' ? 'வாடிக்கையாளர்கள் இல்லை' : 'No clients found'}
+          </div>
+        ) : (
+          filtered.map(c => (
+            <div key={c.id} className="borrower-mobile-card">
+              {/* Top Header: Sl. No, Name, and Principal */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="sl-no-badge font-mono">#{c.sl_no}</span>
+                  <div>
+                    <div
+                      style={{ fontWeight: 800, fontSize: '16px', color: 'var(--text-primary)', lineHeight: 1.2, cursor: 'pointer' }}
+                      onClick={() => { setClientToEdit(c); setShowAddModal(true); }}
+                    >
+                      {c.name}
+                    </div>
+                    {c.address && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '3px', fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '3px' }}>
+                        <MapPin size={11} style={{ flexShrink: 0 }} />
+                        <span>{c.address}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  style={{ textAlign: 'right', flexShrink: 0, cursor: 'pointer' }}
+                  onClick={() => { setClientToEdit(c); setShowAddModal(true); }}
+                >
+                  <div style={{ fontWeight: 800, fontSize: '15.5px', color: 'var(--indigo-primary)', fontFamily: 'monospace' }}>
+                    ₹{(c.principal || 10000).toLocaleString('en-IN')}
+                  </div>
+                  <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {t('principal')}
+                  </div>
+                </div>
+              </div>
+
+              {/* Phone quick link if provided */}
+              {c.phone && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'var(--bg-surface-hover)', borderRadius: 'var(--radius-md)' }}>
+                  <a
+                    href={`tel:${c.phone}`}
+                    style={{ color: 'var(--indigo-primary)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '13px' }}
+                  >
+                    <Phone size={13} />
+                    <span className="font-mono">{c.phone}</span>
+                  </a>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {lang === 'ta' ? 'அழைக்க தட்டவும்' : 'Tap to call'}
+                  </span>
+                </div>
+              )}
+
+              {/* Touch Action Toolbar */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {/* Loan Slip */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReceiptClient(c);
+                      setReceiptInitialType('disbursement');
+                    }}
+                    className="btn btn-secondary btn-sm"
+                    style={{ height: '32px', padding: '0 8px', fontSize: '11px', color: 'var(--indigo-primary)' }}
+                    title={lang === 'ta' ? 'அசல் கடன் சீட்டு (Loan Slip)' : 'New Loan Slip'}
+                  >
+                    <FileText size={12} />
+                    <span>{lang === 'ta' ? 'சீட்டு' : 'Slip'}</span>
+                  </button>
+
+                  {/* WhatsApp */}
+                  {c.phone && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReceiptClient(c);
+                        setReceiptInitialType('collection');
+                      }}
+                      className="btn btn-secondary btn-sm"
+                      style={{ height: '32px', padding: '0 8px', fontSize: '11px', color: '#25D366' }}
+                      title="WhatsApp"
+                    >
+                      <MessageSquare size={12} />
+                      <span>WhatsApp</span>
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  {/* Edit */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setClientToEdit(c);
+                      setShowAddModal(true);
+                    }}
+                    className="btn btn-secondary btn-sm"
+                    style={{ height: '32px', padding: '0 8px', fontSize: '11px' }}
+                    title="Edit"
+                  >
+                    <Edit size={12} />
+                    <span>{t('edit')}</span>
+                  </button>
+
+                  {/* Reset */}
+                  {c.active_cycle_id && (
+                    <button
+                      type="button"
+                      onClick={() => handleReset(c)}
+                      className="btn btn-secondary btn-sm"
+                      style={{ height: '32px', padding: '0 6px', color: 'var(--amber-primary)' }}
+                      title={lang === 'ta' ? 'வசூல் மீட்டமை' : 'Reset Collections'}
+                    >
+                      <RotateCcw size={12} />
+                    </button>
+                  )}
+
+                  {/* Delete */}
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(c.id, c.name)}
+                    className="btn btn-secondary btn-sm"
+                    style={{ height: '32px', padding: '0 6px', color: 'var(--rose-primary)' }}
+                    title="Delete"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {showAddModal && (

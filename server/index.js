@@ -113,6 +113,13 @@ app.use('/api/excel', excelRouter);
 app.use('/api/backup', backupRouter);
 app.use('/api/company', companyRouter);
 
+// Serve uploaded assets statically
+const uploadsDir = path.resolve(__dirname, '../data/uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
+
 // Serve static frontend assets from dist if built
 const distDir = path.resolve(__dirname, '../dist');
 if (fs.existsSync(distDir)) {

@@ -599,7 +599,7 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
         </div>
 
         {/* Quick Status Filter Chips */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+        <div className="mobile-chips-scroll" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <button
             type="button"
             onClick={() => setFilterStatus('all')}
@@ -663,7 +663,7 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
         </div>
 
         {/* Action Buttons & Cloud Sync Status */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div className="mobile-chips-scroll" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {/* Live Auto-Save Status Pill */}
           {saveStatus === 'saving' && (
             <span
@@ -752,21 +752,23 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
             type="button"
             onClick={() => setShowAddClient(true)}
             className="btn btn-primary"
-            style={{ height: '40px' }}
+            style={{ height: '40px', flexShrink: 0 }}
           >
             <Plus size={16} />
-            <span>{t('btn_add_client')}</span>
+            <span className="desktop-only">{t('btn_add_client')}</span>
+            <span className="mobile-only">{lang === 'ta' ? '+ வாடிக்கையாளர்' : '+ Client'}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowRolloverWizard(true)}
             className="btn btn-indigo"
-            style={{ height: '40px' }}
+            style={{ height: '40px', flexShrink: 0 }}
             title={t('next_month_rollover')}
           >
             <RefreshCw size={15} />
-            <span>{t('next_month_rollover')}</span>
+            <span className="desktop-only">{t('next_month_rollover')}</span>
+            <span className="mobile-only">{lang === 'ta' ? 'மாத மாற்றம்' : 'Rollover'}</span>
           </button>
         </div>
       </div>

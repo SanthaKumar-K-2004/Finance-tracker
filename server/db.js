@@ -20,23 +20,74 @@ if (!fs.existsSync(dataDir)) {
 
 const replicaDbPath = path.resolve(dataDir, 'finance_replica.db');
 
-const clientConfig = isTurso
-  ? {
-      url: process.env.TURSO_DATABASE_URL,
-      authToken: process.env.TURSO_AUTH_TOKEN
-    }
-  : {
-      url: `file:${path.resolve(dataDir, 'finance.db')}`
-    };
+const localConfig = {
+  url: `file:${path.resolve(dataDir, 'finance.db')}`
+};
 
 console.log(`🔌 Database Mode: ${isTurso ? 'Turso Cloud (Managed distributed DB with SWR In-Memory Engine)' : 'Local SQLite'}`);
 if (isTurso) {
   console.log(`🌐 Turso Primary: ${process.env.TURSO_DATABASE_URL}`);
 } else {
-  console.log(`📁 Local DB: ${clientConfig.url}`);
+  console.log(`📁 Local DB: ${localConfig.url}`);
 }
 
-export const db = createClient(clientConfig);
+const clientConfig = isTurso
+  ? {
+      url: process.env.TURSO_DATABASE_URL,
+      authToken: process.env.TURSO_AUTH_TOKEN
+    }
+  : localConfig;
+
+const primaryClient = createClient(clientConfig);
+const fallbackClient = isTurso ? createClient(localConfig) : null;
+let usingFallback = false;
+
+export const db = {
+  async execute(stmt) {
+    if (usingFallback && fallbackClient) {
+      return fallbackClient.execute(stmt);
+    }
+    try {
+      return await primaryClient.execute(stmt);
+    } catch (err) {
+      const isDnsOrNetwork = err.message && (
+        err.message.includes('fetch failed') ||
+        err.message.includes('getaddrinfo') ||
+        err.message.includes('EAI_AGAIN') ||
+        err.code === 'EAI_AGAIN' ||
+        err.message.includes('ENOTFOUND')
+      );
+      if (isTurso && isDnsOrNetwork && fallbackClient) {
+        console.warn('⚠️ Turso Cloud connection failed (getaddrinfo/offline). Gracefully routing to Local SQLite (data/finance.db)...');
+        usingFallback = true;
+        return fallbackClient.execute(stmt);
+      }
+      throw err;
+    }
+  },
+  async batch(stmts) {
+    if (usingFallback && fallbackClient) {
+      return fallbackClient.batch(stmts);
+    }
+    try {
+      return await primaryClient.batch(stmts);
+    } catch (err) {
+      const isDnsOrNetwork = err.message && (
+        err.message.includes('fetch failed') ||
+        err.message.includes('getaddrinfo') ||
+        err.message.includes('EAI_AGAIN') ||
+        err.code === 'EAI_AGAIN' ||
+        err.message.includes('ENOTFOUND')
+      );
+      if (isTurso && isDnsOrNetwork && fallbackClient) {
+        console.warn('⚠️ Turso Cloud batch failed (getaddrinfo/offline). Gracefully routing to Local SQLite (data/finance.db)...');
+        usingFallback = true;
+        return fallbackClient.batch(stmts);
+      }
+      throw err;
+    }
+  }
+};
 
 const DB_TIMEOUT_MS = 6500;
 
@@ -146,6 +197,7 @@ CREATE TABLE IF NOT EXISTS companies (
     tagline TEXT,
     phone TEXT,
     address TEXT,
+    logo_url TEXT,
     default_language TEXT DEFAULT 'ta',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -286,5 +338,13 @@ export async function initSchema() {
       throw err;
     }
   }
+
+  // Safe migration for logo_url column
+  try {
+    await db.execute('ALTER TABLE companies ADD COLUMN logo_url TEXT');
+  } catch (e) {
+    // Column already exists or newly created
+  }
+
   console.log('✅ All tables verified & initialized successfully.');
 }

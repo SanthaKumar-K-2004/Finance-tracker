@@ -52,6 +52,8 @@
   "btn_copy": "Copy",
   "btn_copied": "Copied!",
   "btn_call": "Call",
+  "edit": "Edit",
+  "btn_delete": "Delete",
   
   "quick_collect": "Quick Collect:",
   "quick_custom": "Custom",

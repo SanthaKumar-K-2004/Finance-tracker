@@ -1,16 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useCompany } from '../context/CompanyContext';
-import { Settings, Database, Download, Upload, ShieldCheck, Moon, Sun, Clock, Languages, Store, CheckCircle, AlertCircle, Edit3, Save, X } from 'lucide-react';
+import { 
+  Settings, Database, Download, Upload, ShieldCheck, Moon, Sun, 
+  Clock, Languages, Store, CheckCircle, AlertCircle, Edit3, Save, 
+  X, Image as ImageIcon, Trash2, Camera, Sparkles, Check
+} from 'lucide-react';
 
 export default function SettingsPage() {
   const { lang, setLang, t } = useLanguage();
   const { themeMode, setThemeMode } = useTheme();
-  const { company, updateCompany, loading: companyLoading } = useCompany();
+  const { company, updateCompany, uploadLogo, removeLogo, loading: companyLoading } = useCompany();
   const [dbStatus, setDbStatus] = useState(null);
   const [restoreMessage, setRestoreMessage] = useState(null);
   const [restoring, setRestoring] = useState(false);
+
+  // Logo upload state
+  const fileInputRef = useRef(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoMessage, setLogoMessage] = useState(null);
+  const [dragOver, setDragOver] = useState(false);
 
   // Shop Profile editable state
   const [profileForm, setProfileForm] = useState({
@@ -72,6 +82,121 @@ export default function SettingsPage() {
     }
     setIsEditingProfile(false);
     setProfileMessage(null);
+  };
+
+  const processAndUploadLogo = async (file) => {
+    if (!file) return;
+
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
+    if (!validTypes.includes(file.type)) {
+      setLogoMessage({
+        type: 'error',
+        text: lang === 'ta' 
+          ? 'செல்லுபடியாகும் படம் மட்டுமே ஏற்கப்படும் (PNG, JPG, WEBP, SVG).' 
+          : 'Please select a valid image (PNG, JPG, WEBP, SVG).'
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoMessage({
+        type: 'error',
+        text: lang === 'ta' ? 'படத்தின் அளவு 5MB-க்கு குறைவாக இருக்க வேண்டும்.' : 'Image size must be less than 5MB.'
+      });
+      return;
+    }
+
+    setLogoUploading(true);
+    setLogoMessage(null);
+
+    try {
+      if (file.type === 'image/svg+xml') {
+        const res = await uploadLogo(file);
+        if (res.success) {
+          setLogoMessage({
+            type: 'success',
+            text: lang === 'ta' ? 'நிறுவன லோகோ வெற்றிகரமாக பதிவேற்றப்பட்டது!' : 'Shop logo uploaded successfully!'
+          });
+        } else {
+          setLogoMessage({ type: 'error', text: res.error || 'Failed to upload logo' });
+        }
+        setLogoUploading(false);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (readerEvent) => {
+        const img = new window.Image();
+        img.onload = async () => {
+          try {
+            const canvas = document.createElement('canvas');
+            const maxDim = 400;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > maxDim) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              }
+            } else {
+              if (height > maxDim) {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const compressedDataUrl = canvas.toDataURL('image/png', 0.92);
+            const res = await uploadLogo(compressedDataUrl);
+
+            if (res.success) {
+              setLogoMessage({
+                type: 'success',
+                text: lang === 'ta' ? 'நிறுவன லோகோ வெற்றிகரமாக பதிவேற்றப்பட்டது!' : 'Shop logo uploaded successfully!'
+              });
+            } else {
+              setLogoMessage({ type: 'error', text: res.error || 'Failed to upload logo' });
+            }
+          } catch (err) {
+            setLogoMessage({ type: 'error', text: err.message || 'Image processing error' });
+          } finally {
+            setLogoUploading(false);
+          }
+        };
+        img.onerror = () => {
+          setLogoUploading(false);
+          setLogoMessage({ type: 'error', text: 'Failed to parse image file' });
+        };
+        img.src = readerEvent.target.result;
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setLogoUploading(false);
+      setLogoMessage({ type: 'error', text: err.message || 'Failed to read image' });
+    }
+  };
+
+  const handleRemoveLogo = async () => {
+    if (!window.confirm(lang === 'ta' ? 'லோகோவை நீக்க விரும்புகிறீர்களா?' : 'Are you sure you want to remove the logo?')) {
+      return;
+    }
+    setLogoUploading(true);
+    setLogoMessage(null);
+    const res = await removeLogo();
+    setLogoUploading(false);
+    if (res.success) {
+      setLogoMessage({
+        type: 'success',
+        text: lang === 'ta' ? 'லோகோ நீக்கப்பட்டது, இயல்புநிலைக்கு மாற்றப்பட்டது.' : 'Logo removed successfully. Default badge restored.'
+      });
+    } else {
+      setLogoMessage({ type: 'error', text: res.error || 'Failed to remove logo' });
+    }
   };
 
   const loadStatus = () => {
@@ -178,6 +303,207 @@ export default function SettingsPage() {
         <h2 style={{ fontSize: '19px', fontWeight: 800 }}>
           {lang === 'ta' ? 'அமைப்புகள் மற்றும் தரவு பாதுகாப்பு' : 'Settings & Data Protection'}
         </h2>
+      </div>
+
+      {/* Shop Logo & Brand Identity Card */}
+      <div className="card" style={{ border: '1px solid var(--border-subtle)', position: 'relative' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+          <h3 style={{ fontSize: '15px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+            <ImageIcon size={18} color="var(--indigo-primary)" />
+            <span>{lang === 'ta' ? 'நிறுவன லோகோ & அடையாள அட்டை (Logo & Branding)' : 'Shop Logo & Brand Identity'}</span>
+          </h3>
+          <span className="badge badge-indigo" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Sparkles size={12} />
+            <span>{lang === 'ta' ? 'உடனடி காட்சி' : 'Header Live Sync'}</span>
+          </span>
+        </div>
+
+        {logoMessage && (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: '14px',
+              fontSize: '13px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              background: logoMessage.type === 'success' ? 'var(--emerald-light)' : 'var(--rose-light)',
+              color: logoMessage.type === 'success' ? 'var(--emerald-text)' : 'var(--rose-text)'
+            }}
+          >
+            {logoMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+            <span>{logoMessage.text}</span>
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', alignItems: 'center' }}>
+          {/* Logo Visual Live Preview */}
+          <div 
+            style={{ 
+              background: 'var(--bg-surface-hover)', 
+              borderRadius: 'var(--radius-lg)', 
+              padding: '16px', 
+              border: '1px solid var(--border-subtle)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px'
+            }}
+          >
+            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {lang === 'ta' ? 'தற்போதைய லோகோ காட்சி' : 'Live Header Preview'}
+            </span>
+
+            {/* Header Simulator Preview */}
+            <div 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 14px',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-strong)',
+                boxShadow: 'var(--shadow-sm)'
+              }}
+            >
+              <div 
+                style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: 'var(--radius-md)',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+                  flexShrink: 0
+                }}
+              >
+                {company?.logo_url ? (
+                  <img
+                    src={company.logo_url}
+                    alt="Logo"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                ) : (
+                  <span style={{ color: '#ffffff', fontWeight: 900, fontSize: '15px', letterSpacing: '0.5px' }}>
+                    {company?.name ? company.name.trim().substring(0, 3).toUpperCase() : 'ALR'}
+                  </span>
+                )}
+              </div>
+
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontWeight: 800, fontSize: '13.5px', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {company?.name || 'ALR Finance'}
+                  </span>
+                  <span className="badge badge-emerald" style={{ fontSize: '10px', padding: '1px 6px' }}>✓</span>
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {company?.tagline || 'ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ்'}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+              <span>{lang === 'ta' ? 'வடிவம்: சதுரம் (1:1)' : 'Format: Square 1:1'}</span>
+              <span>•</span>
+              <span>{company?.logo_url ? (lang === 'ta' ? 'தனிப்பயன் லோகோ இயங்குகிறது' : 'Custom logo active') : (lang === 'ta' ? 'இயல்புநிலை பேட்ஜ்' : 'Default initials badge')}</span>
+            </div>
+          </div>
+
+          {/* Upload Drop Zone & Actions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                if (e.target.files && e.target.files[0]) {
+                  processAndUploadLogo(e.target.files[0]);
+                }
+              }}
+            />
+
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                  processAndUploadLogo(e.dataTransfer.files[0]);
+                }
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                border: `2px dashed ${dragOver ? 'var(--emerald-primary)' : 'var(--border-strong)'}`,
+                background: dragOver ? 'var(--emerald-light)' : 'var(--bg-surface-hover)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '24px 16px',
+                textAlign: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <div 
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: 'var(--radius-full)',
+                  background: 'var(--bg-surface)',
+                  color: 'var(--emerald-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 10px',
+                  boxShadow: 'var(--shadow-sm)'
+                }}
+              >
+                <Camera size={20} />
+              </div>
+              <div style={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                {logoUploading
+                  ? (lang === 'ta' ? 'லோகோ பதிவேற்றப்படுகிறது...' : 'Uploading Logo...')
+                  : (lang === 'ta' ? 'புதிய லோகோவை பதிவேற்ற கிளிக் செய்யவும்' : 'Click to Upload or Drag & Drop')}
+              </div>
+              <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                PNG, JPG, WEBP, SVG (Max 5MB • Auto-Resized)
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={logoUploading}
+                onClick={() => fileInputRef.current?.click()}
+                style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              >
+                <Upload size={14} />
+                <span>{lang === 'ta' ? 'லோகோ தேர்வு செய்' : 'Choose Logo'}</span>
+              </button>
+
+              {company?.logo_url && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={logoUploading}
+                  onClick={handleRemoveLogo}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--rose-primary)' }}
+                  title="Remove Logo"
+                >
+                  <Trash2 size={14} />
+                  <span>{lang === 'ta' ? 'நீக்கு' : 'Remove'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Shop Profile Information */}

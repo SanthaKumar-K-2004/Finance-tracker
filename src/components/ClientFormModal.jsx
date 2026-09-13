@@ -188,7 +188,7 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
             </div>
 
             {/* Phone and Address */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
               <div className="form-group">
                 <label className="form-label" style={{ fontWeight: 700 }}>
                   {lang === 'ta' ? 'தொலைபேசி எண்' : 'Phone Number'}

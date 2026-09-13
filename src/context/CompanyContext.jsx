@@ -77,8 +77,66 @@ export function CompanyProvider({ children }) {
     }
   }, []);
 
+  const uploadLogo = useCallback(async (fileOrDataUrl) => {
+    try {
+      setLoading(true);
+      setError(null);
+      let res;
+      if (fileOrDataUrl instanceof File || fileOrDataUrl instanceof Blob) {
+        const formData = new FormData();
+        formData.append('logo', fileOrDataUrl);
+        res = await fetch('/api/company/logo', {
+          method: 'POST',
+          body: formData
+        });
+      } else {
+        res = await fetch('/api/company/logo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ logo_data: fileOrDataUrl })
+        });
+      }
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Failed to upload shop logo');
+      }
+      setCompany(json.data);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('alr_company_profile', JSON.stringify(json.data));
+      }
+      return { success: true, data: json.data, logo_url: json.logo_url };
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const removeLogo = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch('/api/company/logo', { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Failed to remove shop logo');
+      }
+      setCompany(json.data);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('alr_company_profile', JSON.stringify(json.data));
+      }
+      return { success: true, data: json.data };
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return (
-    <CompanyContext.Provider value={{ company, loading, error, updateCompany, refreshCompany }}>
+    <CompanyContext.Provider value={{ company, loading, error, updateCompany, refreshCompany, uploadLogo, removeLogo }}>
       {children}
     </CompanyContext.Provider>
   );
@@ -92,7 +150,9 @@ export function useCompany() {
       loading: false,
       error: null,
       updateCompany: async () => ({ success: false, error: 'Provider missing' }),
-      refreshCompany: () => {}
+      refreshCompany: () => {},
+      uploadLogo: async () => ({ success: false, error: 'Provider missing' }),
+      removeLogo: async () => ({ success: false, error: 'Provider missing' })
     };
   }
   return context;

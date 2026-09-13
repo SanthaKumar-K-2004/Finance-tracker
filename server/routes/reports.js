@@ -30,7 +30,10 @@ router.get('/dashboard', async (req, res) => {
         todayStats,
         paymentModes,
         closedStats,
-        defaulters
+        defaulters,
+        dailyTrends,
+        villages,
+        clientsSummary
       ] = await Promise.all([
         // 1. Month overview stats
         safeQuery(
@@ -73,7 +76,7 @@ router.get('/dashboard', async (req, res) => {
            FROM closed_clients WHERE company_id = ?`,
           [companyId]
         ),
-        // 6. Defaulter Radar: Clients with high remaining balance or 0 recent payments
+        // 6. Defaulter Radar: Clients with high remaining balance
         safeQuery(
           `SELECT c.id, c.sl_no, c.name, c.phone, c.address, lc.principal,
                   COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id), 0) as total_collected
@@ -81,8 +84,59 @@ router.get('/dashboard', async (req, res) => {
            JOIN clients c ON c.id = lc.client_id
            WHERE lc.company_id = ? AND lc.month_year = ? AND c.status != 'deleted' AND lc.status != 'archived'
            ORDER BY (lc.principal - COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id), 0)) DESC
-           LIMIT 5`,
+           LIMIT 10`,
           [companyId, month_year]
+        ),
+        // 7. Daily Collection Velocity Trend (Days 1 to 31)
+        safeQuery(
+          `SELECT dc.day_number, COALESCE(SUM(dc.amount), 0) as amount, COUNT(dc.id) as count
+           FROM daily_collections dc
+           JOIN loan_cycles lc ON lc.id = dc.cycle_id
+           WHERE lc.company_id = ? AND lc.month_year = ? AND lc.status != 'archived'
+           GROUP BY dc.day_number
+           ORDER BY dc.day_number ASC`,
+          [companyId, month_year]
+        ),
+        // 8. Route / Village-wise Performance Breakdown
+        safeQuery(
+          `SELECT 
+             COALESCE(NULLIF(TRIM(c.address), ''), 'General') as village,
+             COUNT(DISTINCT c.id) as client_count,
+             COALESCE(SUM(lc.principal), 0) as principal,
+             COALESCE(SUM(coll.total_coll), 0) as collected
+           FROM loan_cycles lc
+           JOIN clients c ON c.id = lc.client_id
+           LEFT JOIN (
+             SELECT cycle_id, SUM(amount) as total_coll
+             FROM daily_collections
+             GROUP BY cycle_id
+           ) coll ON coll.cycle_id = lc.id
+           WHERE lc.company_id = ? AND lc.month_year = ? AND c.status != 'deleted' AND lc.status != 'archived'
+           GROUP BY village
+           ORDER BY collected DESC`,
+          [companyId, month_year]
+        ),
+        // 9. Lightweight Clients Summary for 0ms Real-Time Frontend Multi-Filtering
+        safeQuery(
+          `SELECT c.id, c.sl_no, c.name, c.phone, c.address, lc.principal,
+                  COALESCE(coll.total_coll, 0) as total_collected,
+                  COALESCE(today_coll.today_amt, 0) as paid_today
+           FROM loan_cycles lc
+           JOIN clients c ON c.id = lc.client_id
+           LEFT JOIN (
+             SELECT cycle_id, SUM(amount) as total_coll
+             FROM daily_collections
+             GROUP BY cycle_id
+           ) coll ON coll.cycle_id = lc.id
+           LEFT JOIN (
+             SELECT cycle_id, SUM(amount) as today_amt
+             FROM daily_collections
+             WHERE collection_date = ?
+             GROUP BY cycle_id
+           ) today_coll ON today_coll.cycle_id = lc.id
+           WHERE lc.company_id = ? AND lc.month_year = ? AND c.status != 'deleted' AND lc.status != 'archived'
+           ORDER BY c.sl_no ASC`,
+          [today, companyId, month_year]
         )
       ]);
 
@@ -91,6 +145,41 @@ router.get('/dashboard', async (req, res) => {
       const totalCollected = collectionStats[0]?.total_collected || 0;
       const totalRemaining = Math.max(0, totalPrincipal - totalCollected);
       const collectionRate = totalPrincipal > 0 ? Math.round((totalCollected / totalPrincipal) * 100) : 0;
+
+      // Process route/village metrics
+      const processedVillages = (villages || []).map(v => {
+        const p = Number(v.principal) || 0;
+        const c = Number(v.collected) || 0;
+        const rem = Math.max(0, p - c);
+        const rate = p > 0 ? Math.round((c / p) * 100) : 0;
+        return {
+          village: v.village,
+          client_count: Number(v.client_count) || 0,
+          principal: p,
+          collected: c,
+          remaining: rem,
+          collection_rate: rate
+        };
+      });
+
+      // Process lightweight clients summary for client-side multi-filter
+      const processedClients = (clientsSummary || []).map(c => {
+        const p = Number(c.principal) || 0;
+        const coll = Number(c.total_collected) || 0;
+        const rem = Math.max(0, p - coll);
+        return {
+          id: c.id,
+          sl_no: c.sl_no,
+          name: c.name,
+          phone: c.phone,
+          address: c.address,
+          principal: p,
+          total_collected: coll,
+          remaining: rem,
+          paid_today: Number(c.paid_today) || 0,
+          is_cleared: coll >= p && p > 0
+        };
+      });
 
       return {
         success: true,
@@ -105,7 +194,10 @@ router.get('/dashboard', async (req, res) => {
           today_entries: todayStats[0]?.today_entries || 0,
           total_closed_loans: closedStats[0]?.total_closed || 0,
           payment_modes: paymentModes,
-          defaulters: defaulters.map(d => ({
+          daily_trends: dailyTrends || [],
+          villages: processedVillages,
+          clients_summary: processedClients,
+          defaulters: (defaulters || []).map(d => ({
             ...d,
             remaining: Math.max(0, d.principal - d.total_collected)
           }))
