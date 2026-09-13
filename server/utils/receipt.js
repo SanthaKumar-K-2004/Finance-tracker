@@ -35,6 +35,58 @@ export function generateWhatsAppUrl(phone, messageText) {
 }
 
 /**
+ * Calculate the next day's date in DD/MM/YYYY format
+ */
+export function getNextDayDate(dStr) {
+  if (!dStr) return '';
+  let d, m, y;
+  if (dStr.includes('/')) {
+    [d, m, y] = dStr.split('/').map(Number);
+  } else if (dStr.includes('-')) {
+    [y, m, d] = dStr.split('-').map(Number);
+  } else {
+    const dt = new Date(dStr);
+    if (isNaN(dt.getTime())) return '';
+    dt.setDate(dt.getDate() + 1);
+    const nd = String(dt.getDate()).padStart(2, '0');
+    const nm = String(dt.getMonth() + 1).padStart(2, '0');
+    return `${nd}/${nm}/${dt.getFullYear()}`;
+  }
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + 1);
+  const nd = String(dt.getDate()).padStart(2, '0');
+  const nm = String(dt.getMonth() + 1).padStart(2, '0');
+  const ny = dt.getFullYear();
+  return `${nd}/${nm}/${ny}`;
+}
+
+/**
+ * Calculate the previous day's date in DD/MM/YYYY format
+ */
+export function getPrevDayDate(dStr) {
+  if (!dStr) return '';
+  let d, m, y;
+  if (dStr.includes('/')) {
+    [d, m, y] = dStr.split('/').map(Number);
+  } else if (dStr.includes('-')) {
+    [y, m, d] = dStr.split('-').map(Number);
+  } else {
+    const dt = new Date(dStr);
+    if (isNaN(dt.getTime())) return '';
+    dt.setDate(dt.getDate() - 1);
+    const nd = String(dt.getDate()).padStart(2, '0');
+    const nm = String(dt.getMonth() + 1).padStart(2, '0');
+    return `${nd}/${nm}/${dt.getFullYear()}`;
+  }
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() - 1);
+  const nd = String(dt.getDate()).padStart(2, '0');
+  const nm = String(dt.getMonth() + 1).padStart(2, '0');
+  const ny = dt.getFullYear();
+  return `${nd}/${nm}/${ny}`;
+}
+
+/**
  * Format collection receipt text (concise message or full thermal slip)
  */
 export function formatCollectionReceipt({
@@ -43,6 +95,7 @@ export function formatCollectionReceipt({
   sl_no = '',
   address = '',
   date = new Date().toLocaleDateString('en-GB'),
+  next_date = '',
   amount = 0,
   principal = 10000,
   total_collected = 0,
@@ -60,6 +113,7 @@ export function formatCollectionReceipt({
   const formattedTotalCollected = Number(total_collected || 0).toLocaleString('en-IN');
   const tenureDays = Number(total_days || 31);
   const expectedDaily = Math.round(Number(principal || 10000) / tenureDays).toLocaleString('en-IN');
+  const resolvedNextDate = next_date || getNextDayDate(date);
 
   // 1. Concise 1-tap WhatsApp message
   if (format === 'concise') {
@@ -83,6 +137,7 @@ export function formatCollectionReceipt({
 தொலைபேசி: ${phone || '-'}
 முகவரி: ${address || '-'}
 ${start_date ? `துவக்க தேதி: ${start_date}\n` : ''}தேதி: ${date}
+அடுத்த தவணை: ${resolvedNextDate}
 
 தவணை அசல்: ₹${formattedPrincipal}
 இதுவரை வரவு: ₹${formattedTotalCollected}
@@ -100,6 +155,7 @@ Client: ${name}
 Phone: ${phone || '-'}
 Address: ${address || '-'}
 ${start_date ? `Start Date: ${start_date}\n` : ''}Date: ${date}
+Next Due Date: ${resolvedNextDate}
 
 Thavanai Principal: ₹${formattedPrincipal}
 Total Collected: ₹${formattedTotalCollected}
@@ -119,12 +175,16 @@ export function formatDisbursementSlip({
   sl_no = '',
   address = '',
   date = new Date().toLocaleDateString('en-GB'),
+  start_date = '',
+  next_date = '',
   principal = 10000,
   shopName,
   lang = 'ta'
 }) {
   const resolvedShopName = shopName || (lang === 'ta' ? DEFAULT_SHOP_NAME_TA : DEFAULT_SHOP_NAME_EN);
   const formattedPrincipal = Number(principal || 10000).toLocaleString('en-IN');
+  const resolvedStartDate = start_date || date;
+  const resolvedNextDate = next_date || getNextDayDate(date);
 
   if (lang === 'ta') {
     return `*${resolvedShopName} — புதிய தவணை அசல் வழங்கல் ரசீது*
@@ -133,7 +193,8 @@ export function formatDisbursementSlip({
 வாடிக்கையாளர்: ${name}
 தொலைபேசி: ${phone || '-'}
 முகவரி: ${address || '-'}
-துவக்க தேதி: ${date}
+துவக்க தேதி: ${resolvedStartDate}
+${resolvedStartDate !== date ? `வழங்கப்பட்ட தேதி: ${date}\n` : ''}அடுத்த தவணை: ${resolvedNextDate}
 
 வழங்கப்பட்ட தவணை அசல்: ₹${formattedPrincipal}
 --------------------------------
@@ -148,7 +209,8 @@ S.No: ${sl_no || 1}
 Client: ${name}
 Phone: ${phone || '-'}
 Address: ${address || '-'}
-Start Date: ${date}
+Start Date: ${resolvedStartDate}
+${resolvedStartDate !== date ? `Disbursed Date: ${date}\n` : ''}Next Due Date: ${resolvedNextDate}
 
 Thavanai Principal: ₹${formattedPrincipal}
 --------------------------------

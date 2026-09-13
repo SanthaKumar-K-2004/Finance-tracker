@@ -19,9 +19,76 @@ import {
   BluetoothConnected,
   RotateCcw,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { printViaBluetooth, isBluetoothSupported } from '../utils/bluetoothPrinter';
+
+// Date helpers for Next Day & Previous Day calculation
+export const getNextDayDate = (dStr) => {
+  if (!dStr) return '';
+  let d, m, y;
+  if (dStr.includes('/')) {
+    [d, m, y] = dStr.split('/').map(Number);
+  } else if (dStr.includes('-')) {
+    [y, m, d] = dStr.split('-').map(Number);
+  } else {
+    const dt = new Date(dStr);
+    if (isNaN(dt.getTime())) return '';
+    dt.setDate(dt.getDate() + 1);
+    const nd = String(dt.getDate()).padStart(2, '0');
+    const nm = String(dt.getMonth() + 1).padStart(2, '0');
+    return `${nd}/${nm}/${dt.getFullYear()}`;
+  }
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + 1);
+  const nd = String(dt.getDate()).padStart(2, '0');
+  const nm = String(dt.getMonth() + 1).padStart(2, '0');
+  const ny = dt.getFullYear();
+  return `${nd}/${nm}/${ny}`;
+};
+
+export const getPrevDayDate = (dStr) => {
+  if (!dStr) return '';
+  let d, m, y;
+  if (dStr.includes('/')) {
+    [d, m, y] = dStr.split('/').map(Number);
+  } else if (dStr.includes('-')) {
+    [y, m, d] = dStr.split('-').map(Number);
+  } else {
+    const dt = new Date(dStr);
+    if (isNaN(dt.getTime())) return '';
+    dt.setDate(dt.getDate() - 1);
+    const nd = String(dt.getDate()).padStart(2, '0');
+    const nm = String(dt.getMonth() + 1).padStart(2, '0');
+    return `${nd}/${nm}/${dt.getFullYear()}`;
+  }
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() - 1);
+  const nd = String(dt.getDate()).padStart(2, '0');
+  const nm = String(dt.getMonth() + 1).padStart(2, '0');
+  const ny = dt.getFullYear();
+  return `${nd}/${nm}/${ny}`;
+};
+
+export const formatToHtmlDate = (dStr) => {
+  if (!dStr) return '';
+  if (dStr.includes('/')) {
+    const [d, m, y] = dStr.split('/');
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return dStr;
+};
+
+export const formatFromHtmlDate = (htmlVal) => {
+  if (!htmlVal) return '';
+  if (htmlVal.includes('-')) {
+    const [y, m, d] = htmlVal.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  return htmlVal;
+};
 
 export default function ReceiptModal({ client, totalDays: propTotalDays, mode = 'whatsapp', initialType = 'collection', onClose }) {
   const { lang: appLang } = useLanguage();
@@ -59,7 +126,7 @@ export default function ReceiptModal({ client, totalDays: propTotalDays, mode = 
 
   const totalDays = propTotalDays || client.total_days || 31;
 
-  // 1. Calendar/Sheet Date & Time Synchronization
+  // 1. Calendar/Sheet Date & Time Synchronization with dynamic Next-Day Stepper
   const getReceiptDate = () => {
     if (client.receipt_date) return client.receipt_date;
     if (client.date) {
@@ -84,7 +151,14 @@ export default function ReceiptModal({ client, totalDays: propTotalDays, mode = 
     return new Date().toLocaleDateString('en-GB');
   };
 
-  const receiptDate = getReceiptDate();
+  const [activeReceiptDate, setActiveReceiptDate] = useState(() => getReceiptDate());
+
+  useEffect(() => {
+    setActiveReceiptDate(getReceiptDate());
+  }, [client]);
+
+  const receiptDate = activeReceiptDate;
+  const nextDate = getNextDayDate(receiptDate);
 
   // 2. Start Date computation from loan cycle
   const getStartDate = () => {
@@ -92,9 +166,36 @@ export default function ReceiptModal({ client, totalDays: propTotalDays, mode = 
     if (raw) {
       return raw.includes('-') ? raw.split('-').reverse().join('/') : raw;
     }
-    return receiptDate;
+    return getReceiptDate();
   };
   const startDate = getStartDate();
+
+  // Interactive Date Handlers for Next Day and Previous Day
+  const handleStepDate = (direction) => {
+    const newDate = direction === 'next' ? getNextDayDate(activeReceiptDate) : getPrevDayDate(activeReceiptDate);
+    setActiveReceiptDate(newDate);
+
+    const newDay = parseInt(newDate.split('/')[0], 10);
+    if (client.days && client.days[newDay] !== undefined) {
+      setPaymentAmount(Number(client.days[newDay] || 0));
+    } else {
+      setPaymentAmount(0);
+    }
+  };
+
+  const handleCustomDateChange = (e) => {
+    const htmlVal = e.target.value;
+    if (!htmlVal) return;
+    const newDate = formatFromHtmlDate(htmlVal);
+    setActiveReceiptDate(newDate);
+
+    const newDay = parseInt(newDate.split('/')[0], 10);
+    if (client.days && client.days[newDay] !== undefined) {
+      setPaymentAmount(Number(client.days[newDay] || 0));
+    } else {
+      setPaymentAmount(0);
+    }
+  };
 
   const shopName = company?.name || (receiptLang === 'ta' ? 'ALR ஃபைனான்ஸ்' : 'ALR Finance');
   const shopPhone = company?.phone || '9585194934';
@@ -103,10 +204,11 @@ export default function ReceiptModal({ client, totalDays: propTotalDays, mode = 
   const principal = Number(client.principal || 10000);
   const currentPay = Math.max(0, Number(paymentAmount) || 0);
 
-  // Calculate base collected prior to today's entry
-  const recordedDayAmt = (client.days && client.selected_day && client.days[client.selected_day] !== undefined)
-    ? Number(client.days[client.selected_day] || 0)
-    : (client.today_paid !== undefined ? Number(client.today_paid) : 0);
+  // Calculate base collected prior to active day entry
+  const activeDayNum = parseInt(receiptDate.split('/')[0], 10);
+  const recordedDayAmt = (client.days && client.days[activeDayNum] !== undefined)
+    ? Number(client.days[activeDayNum] || 0)
+    : ((client.selected_day === activeDayNum && client.today_paid !== undefined) ? Number(client.today_paid) : 0);
 
   const baseCollected = Math.max(0, Number(client.total_collected || 0) - recordedDayAmt);
   const liveTotalCollected = baseCollected + currentPay;
@@ -114,12 +216,12 @@ export default function ReceiptModal({ client, totalDays: propTotalDays, mode = 
 
   // 1. Concise 1-Tap WhatsApp Message Templates
   const conciseTa = currentPay > 0
-    ? `வணக்கம் ${client.name}, ${receiptDate} இன்றைய தவணை வரவு: ₹${currentPay.toLocaleString('en-IN')}. மீதமுள்ள தவணை நிலுவை: ₹${liveRemaining.toLocaleString('en-IN')}. நன்றி, ${shopName}.`
-    : `வணக்கம் ${client.name}, ${receiptDate} நிலவரப்படி தங்களின் தவணை நிலுவைத் தொகை: ₹${liveRemaining.toLocaleString('en-IN')}. விரைந்து செலுத்தி ஒத்துழைக்க வேண்டுகிறோம். நன்றி, ${shopName}.`;
+    ? `வணக்கம் ${client.name}, ${receiptDate} இன்றைய தவணை வரவு: ₹${currentPay.toLocaleString('en-IN')}. அடுத்த தவணை: ${nextDate}. மீதமுள்ள தவணை நிலுவை: ₹${liveRemaining.toLocaleString('en-IN')}. நன்றி, ${shopName}.`
+    : `வணக்கம் ${client.name}, ${receiptDate} நிலவரப்படி தங்களின் தவணை நிலுவைத் தொகை: ₹${liveRemaining.toLocaleString('en-IN')}. அடுத்த தவணை: ${nextDate}. விரைந்து செலுத்தி ஒத்துழைக்க வேண்டுகிறோம். நன்றி, ${shopName}.`;
 
   const conciseEn = currentPay > 0
-    ? `Dear ${client.name}, Thavanai collection received on ${receiptDate}: ₹${currentPay.toLocaleString('en-IN')}. Remaining balance: ₹${liveRemaining.toLocaleString('en-IN')}. Thank you, ${shopName}.`
-    : `Dear ${client.name}, Thavanai reminder for ${receiptDate}. Outstanding balance: ₹${liveRemaining.toLocaleString('en-IN')}. Thank you, ${shopName}.`;
+    ? `Dear ${client.name}, Thavanai collection received on ${receiptDate}: ₹${currentPay.toLocaleString('en-IN')}. Next Due: ${nextDate}. Remaining balance: ₹${liveRemaining.toLocaleString('en-IN')}. Thank you, ${shopName}.`
+    : `Dear ${client.name}, Thavanai reminder for ${receiptDate}. Next Due: ${nextDate}. Outstanding balance: ₹${liveRemaining.toLocaleString('en-IN')}. Thank you, ${shopName}.`;
 
   // 2. Full Thermal POS Slip Format (58mm / 80mm Print)
   const collectionReceiptTa = `================================
@@ -130,8 +232,9 @@ export default function ReceiptModal({ client, totalDays: propTotalDays, mode = 
 வாடிக்கையாளர்  : ${client.name}
 தொலைபேசி எண்   : ${client.phone || '-'}
 முகவரி        : ${client.address || '-'}
-தவணை துவக்கம்  : ${startDate}
+துவக்க தேதி   : ${startDate}
 தேதி          : ${receiptDate}
+அடுத்த தவணை   : ${nextDate}
 --------------------------------
 தவணை அசல்     : ₹${principal.toLocaleString('en-IN')}
 இன்றைய வரவு    : ₹${currentPay.toLocaleString('en-IN')}
@@ -153,6 +256,7 @@ Phone Number   : ${client.phone || '-'}
 Address        : ${client.address || '-'}
 Start Date     : ${startDate}
 Date           : ${receiptDate}
+Next Due Date  : ${nextDate}
 --------------------------------
 Thavanai Principal: ₹${principal.toLocaleString('en-IN')}
 Collected Today   : ₹${currentPay.toLocaleString('en-IN')}
@@ -169,12 +273,13 @@ ${shopAddress}`;
 *(தினசரி தவணை வரவு ரசீது)* 📋
 ━━━━━━━━━━━━━━━━━━
 வணக்கம் *${client.name}* அவர்களே,
-📅 தேதி          : ${receiptDate}
 📋 வ.எண்         : ${client.sl_no || 1}
 👤 பெயர்          : ${client.name}
 📞 தொலைபேசி எண்  : ${client.phone || '-'}
 📍 முகவரி        : ${client.address || '-'}
-🗓️ தவணை துவக்கம்  : ${startDate}
+🗓️ துவக்க தேதி  : ${startDate}
+📅 இன்றைய தேதி   : ${receiptDate}
+⏭️ அடுத்த தவணை  : ${nextDate}
 ──────────────────
 💰 தவணை அசல்     : ₹${principal.toLocaleString('en-IN')}
 💵 இன்றைய வரவு    : *₹${currentPay.toLocaleString('en-IN')}*
@@ -188,12 +293,13 @@ ${liveRemaining === 0 ? '🎉 தங்களின் தவணை கணக்
 *(Daily Thavanai Receipt)* 📋
 ━━━━━━━━━━━━━━━━━━
 Dear *${client.name}*,
-📅 Date           : ${receiptDate}
 📋 S.No           : ${client.sl_no || 1}
 👤 Client Name    : ${client.name}
 📞 Phone Number   : ${client.phone || '-'}
 📍 Address        : ${client.address || '-'}
 🗓️ Start Date     : ${startDate}
+📅 Current Date   : ${receiptDate}
+⏭️ Next Due Date  : ${nextDate}
 ──────────────────
 💰 Thavanai Principal: ₹${principal.toLocaleString('en-IN')}
 💵 Collected Today   : *₹${currentPay.toLocaleString('en-IN')}*
@@ -213,6 +319,8 @@ ${liveRemaining === 0 ? '🎉 Your thavanai account is fully settled! Thank you!
 தொலைபேசி எண்   : ${client.phone || '-'}
 முகவரி        : ${client.address || '-'}
 துவக்க தேதி   : ${startDate}
+தேதி          : ${receiptDate}
+அடுத்த தவணை   : ${nextDate}
 --------------------------------
 வழங்கப்பட்ட தவணை அசல்: ₹${principal.toLocaleString('en-IN')}
 --------------------------------
@@ -230,6 +338,8 @@ Client Name        : ${client.name}
 Phone Number       : ${client.phone || '-'}
 Address            : ${client.address || '-'}
 Start Date         : ${startDate}
+Date               : ${receiptDate}
+Next Due Date      : ${nextDate}
 --------------------------------
 Thavanai Principal : ₹${principal.toLocaleString('en-IN')}
 --------------------------------
@@ -471,6 +581,97 @@ Contact: ${shopPhone}
             </div>
           </div>
 
+          {/* Interactive Date Stepper & Next Day Controller */}
+          <div
+            className="receipt-date-controller-bar"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'var(--bg-surface-hover)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-md)',
+              padding: '8px 12px',
+              gap: '8px',
+              flexWrap: 'wrap'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+              <Calendar size={14} color="var(--indigo-primary)" />
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                {receiptLang === 'ta' ? 'ரசீது தேதி:' : 'Receipt Date:'}
+              </span>
+              
+              {/* Prev Day Stepper */}
+              <button
+                type="button"
+                onClick={() => handleStepDate('prev')}
+                className="btn btn-secondary btn-sm"
+                style={{ padding: '3px 8px', fontSize: '11px', fontWeight: 700, height: '28px' }}
+                title={receiptLang === 'ta' ? 'முந்தைய நாள்' : 'Previous Day'}
+              >
+                ← {receiptLang === 'ta' ? 'முந்தைய நாள்' : 'Prev'}
+              </button>
+
+              {/* Native Date Input Picker linked to activeReceiptDate */}
+              <input
+                type="date"
+                value={formatToHtmlDate(receiptDate)}
+                onChange={handleCustomDateChange}
+                style={{
+                  padding: '2px 8px',
+                  fontSize: '12px',
+                  fontWeight: 800,
+                  fontFamily: 'var(--font-mono)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-strong)',
+                  background: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                  height: '28px'
+                }}
+                title={receiptLang === 'ta' ? 'தேதியை தேர்வு செய்க' : 'Select Date'}
+              />
+
+              {/* Next Day Stepper */}
+              <button
+                type="button"
+                onClick={() => handleStepDate('next')}
+                className="btn btn-secondary btn-sm"
+                style={{ padding: '3px 8px', fontSize: '11px', fontWeight: 700, height: '28px' }}
+                title={receiptLang === 'ta' ? 'அடுத்த நாள்' : 'Next Day'}
+              >
+                {receiptLang === 'ta' ? 'அடுத்த நாள்' : 'Next'} →
+              </button>
+            </div>
+
+            {/* Quick 1-Click "Change to Next Day Date" Button */}
+            <button
+              type="button"
+              onClick={() => handleStepDate('next')}
+              className="btn btn-sm"
+              style={{
+                background: 'linear-gradient(135deg, var(--emerald-primary), #059669)',
+                color: '#ffffff',
+                border: 'none',
+                padding: '4px 12px',
+                fontSize: '11.5px',
+                fontWeight: 800,
+                height: '28px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                borderRadius: 'var(--radius-sm)',
+                boxShadow: '0 2px 4px rgba(16, 185, 129, 0.25)',
+                cursor: 'pointer'
+              }}
+              title={receiptLang === 'ta' ? 'ரசீது தேதியை அடுத்த நாளுக்கு மாற்றுக' : 'Advance receipt date to tomorrow'}
+            >
+              <span>⏩</span>
+              <span>{receiptLang === 'ta' ? 'அடுத்த நாள் தேதிக்கு மாற்று (+1 நாள்)' : 'Change Date to Next Day (+1)'}</span>
+            </button>
+          </div>
+
           {/* Interactive Today's Payment Adjustment Bar */}
           {receiptType === 'collection' && (
             <div className="receipt-pay-input-card">
@@ -552,7 +753,7 @@ Contact: ${shopPhone}
                     {receiptLang === 'ta' ? `வ.எண்: ${client.sl_no || 1}` : `S.No: ${client.sl_no || 1}`}
                   </span>
                 </div>
-                <div className="summary-meta-row">
+                <div className="summary-meta-row" style={{ flexWrap: 'wrap', gap: '8px' }}>
                   {client.phone && (
                     <span className="summary-meta-item">
                       <Phone size={12} color="var(--text-muted)" />
@@ -565,9 +766,17 @@ Contact: ${shopPhone}
                       {client.address}
                     </span>
                   )}
-                  <span className="summary-meta-item">
-                    <Calendar size={12} color="var(--text-muted)" />
+                  <span className="summary-meta-item font-mono" style={{ color: 'var(--text-secondary)', fontWeight: 700 }}>
+                    <Calendar size={12} color="var(--indigo-primary)" />
                     {receiptLang === 'ta' ? 'துவக்கம்: ' : 'Start: '}{startDate}
+                  </span>
+                  <span className="summary-meta-item font-mono" style={{ color: 'var(--emerald-primary)', fontWeight: 800 }}>
+                    <Calendar size={12} color="var(--emerald-primary)" />
+                    {receiptLang === 'ta' ? 'தேதி: ' : 'Date: '}{receiptDate}
+                  </span>
+                  <span className="summary-meta-item font-mono" style={{ color: 'var(--indigo-primary)', fontWeight: 800 }}>
+                    <Clock size={12} color="var(--indigo-primary)" />
+                    {receiptLang === 'ta' ? 'அடுத்த தவணை: ' : 'Next Due: '}{nextDate}
                   </span>
                 </div>
               </div>
