@@ -19,7 +19,11 @@ router.get('/', async (req, res) => {
                 lc.total_days,
                 COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id), 0) as total_collected
          FROM clients c
-         LEFT JOIN loan_cycles lc ON lc.client_id = c.id AND lc.status = 'active'
+         LEFT JOIN loan_cycles lc ON lc.id = (
+           SELECT id FROM loan_cycles 
+           WHERE client_id = c.id AND status = 'active' 
+           ORDER BY month_year DESC LIMIT 1
+         )
          WHERE c.status != 'deleted'
          ORDER BY c.sl_no ASC`
       );
