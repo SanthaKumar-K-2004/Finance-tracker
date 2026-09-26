@@ -19,7 +19,7 @@ export default function CollectionModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const val = parseFloat(amount) || 0;
+    const val = typeof amount === 'string' ? (parseFloat(amount.replace(/[^0-9.-]/g, '')) || 0) : (Number(amount) || 0);
     onSave(client.cycle_id, client.client_id, parseInt(day, 10), val, paymentMode, notes);
     onClose();
   };

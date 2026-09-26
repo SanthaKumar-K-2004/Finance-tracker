@@ -226,6 +226,37 @@ router.get('/status', async (req, res) => {
   }
 });
 
+// POST clean database slate (Wipes test borrowers & records for fresh production start)
+router.post('/clean-slate', async (req, res) => {
+  try {
+    const { confirmation } = req.body;
+    if (confirmation !== 'CONFIRM_CLEAN_SLATE') {
+      return res.status(400).json({
+        success: false,
+        error: 'Confirmation required. Pass { confirmation: "CONFIRM_CLEAN_SLATE" }'
+      });
+    }
+
+    // Execute child-first foreign-key deletions
+    await execute('DELETE FROM daily_collections;');
+    await execute('DELETE FROM loan_cycles;');
+    await execute('DELETE FROM clients;');
+    await execute('DELETE FROM closed_clients;');
+    await execute('DELETE FROM settlements;');
+    await execute('DELETE FROM whatsapp_logs;');
+
+    // Invalidate all server caches
+    serverCache.clear();
+
+    res.json({
+      success: true,
+      message: 'All borrower records, loan cycles, collections, and archives successfully wiped. Database is now 100% fresh and production-ready.'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // GET binary SQLite database snapshot (1-click finance.db download)
 router.get('/download-db', async (req, res) => {
   try {

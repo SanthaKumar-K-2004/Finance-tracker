@@ -69,7 +69,7 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
           name: name.trim(),
           phone: phone.trim(),
           address: address.trim(),
-          principal: parseFloat(principal) || 10000,
+          principal: typeof principal === 'string' ? (parseFloat(principal.replace(/[^0-9.-]/g, '')) || 10000) : (Number(principal) || 10000),
           month_year: monthYear || '2026-05'
         })
       });

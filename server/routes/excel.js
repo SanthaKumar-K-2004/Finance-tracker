@@ -6,6 +6,7 @@ import fs from 'fs';
 import { query, execute, batch } from '../db.js';
 import crypto from 'crypto';
 import { serverCache } from '../utils/cache.js';
+import { parseCurrencyNumber } from '../utils/currency.js';
 
 const router = Router();
 const XLSX = xlsx.default || xlsx;
@@ -19,15 +20,6 @@ function colToLetter(col) {
     c = Math.floor(c / 26) - 1;
   }
   return letter;
-}
-
-// Helper: Clean currency and number strings (handles "10,000", "₹10,000", etc.)
-function parseCurrencyNumber(val, defaultVal = 0) {
-  if (val === undefined || val === null || val === '') return defaultVal;
-  if (typeof val === 'number') return isNaN(val) ? defaultVal : val;
-  const cleaned = String(val).replace(/[^0-9.-]/g, '');
-  const parsed = parseFloat(cleaned);
-  return isNaN(parsed) ? defaultVal : parsed;
 }
 
 // Setup upload directory for Excel files

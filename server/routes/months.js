@@ -22,11 +22,27 @@ router.get('/', async (req, res) => {
         [companyId]
       );
 
-      // Fallback if no months exist
+      // Dynamic fallback if no months exist in database
       if (months.length === 0) {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonthNum = String(now.getMonth() + 1).padStart(2, '0');
+        const defaultMonthYear = `${currentYear}-${currentMonthNum}`;
+        const days = new Date(currentYear, now.getMonth() + 1, 0).getDate();
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const cycleName = `${monthNames[now.getMonth()]} ${currentYear}`;
+
         return {
           success: true,
-          data: [{ month_year: '2026-05', cycle_name: 'May 2026 (வைகாசி)', total_clients: 0, total_principal: 0 }]
+          data: [{
+            month_year: defaultMonthYear,
+            cycle_name: cycleName,
+            total_clients: 0,
+            total_principal: 0,
+            total_days: days,
+            start_date: `${defaultMonthYear}-01`,
+            end_date: `${defaultMonthYear}-${String(days).padStart(2, '0')}`
+          }]
         };
       }
 
@@ -63,12 +79,25 @@ router.get('/:month_year', async (req, res) => {
       [companyId, month_year]
     );
 
-    if (month.length === 0) {
-      return res.status(404).json({ success: false, error: `Month cycle ${month_year} not found` });
-    }
-
     const [y, mon] = month_year.split('-').map(Number);
     const days = (y && mon) ? new Date(y, mon, 0).getDate() : 31;
+
+    if (month.length === 0) {
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const cycleName = (y && mon && mon >= 1 && mon <= 12) ? `${monthNames[mon - 1]} ${y}` : month_year;
+      return res.json({
+        success: true,
+        data: {
+          month_year,
+          cycle_name: cycleName,
+          total_clients: 0,
+          total_principal: 0,
+          total_days: days,
+          start_date: `${month_year}-01`,
+          end_date: `${month_year}-${String(days).padStart(2, '0')}`
+        }
+      });
+    }
 
     res.json({ success: true, data: { ...month[0], total_days: days } });
   } catch (err) {

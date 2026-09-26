@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query, execute } from '../db.js';
 import crypto from 'crypto';
 import { serverCache } from '../utils/cache.js';
+import { parseCurrencyNumber } from '../utils/currency.js';
 
 const router = Router();
 
@@ -131,7 +132,8 @@ router.post('/', async (req, res) => {
     if (!clientId) {
       // Determine sl_no: use provided sl_no or auto-increment from MAX
       const maxSlResult = await query('SELECT MAX(sl_no) as max_sl FROM clients');
-      const autoSlNo = (maxSlResult[0]?.max_sl || 3000) + 1;
+      const maxSl = maxSlResult[0]?.max_sl;
+      const autoSlNo = (maxSl !== null && maxSl !== undefined) ? (parseInt(maxSl, 10) + 1) : 1;
       nextSlNo = req.body.sl_no ? parseInt(req.body.sl_no, 10) : autoSlNo;
 
       clientId = `client_${nextSlNo}_${crypto.randomBytes(3).toString('hex')}`;
@@ -146,7 +148,7 @@ router.post('/', async (req, res) => {
 
     // Create loan cycle for this client
     const cycleId = `cycle_${nextSlNo}_${month_year.replace('-', '_')}_${crypto.randomBytes(3).toString('hex')}`;
-    const principalAmount = parseFloat(principal) || 10000;
+    const principalAmount = parseCurrencyNumber(principal, 10000);
 
     // Compute actual days in month (e.g. Feb: 28/29, Apr: 30, May: 31)
     const [yStr, mStr] = month_year.split('-');
@@ -207,7 +209,7 @@ router.put('/:id', async (req, res) => {
     );
 
     if (principal !== undefined) {
-      const parsedPrincipal = parseFloat(principal);
+      const parsedPrincipal = parseCurrencyNumber(principal, 0);
       if (month_year) {
         await execute(
           `UPDATE loan_cycles SET principal = ? WHERE client_id = ? AND month_year = ?`,

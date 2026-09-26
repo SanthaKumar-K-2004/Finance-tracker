@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query, execute, batch } from '../db.js';
 import crypto from 'crypto';
 import { serverCache } from '../utils/cache.js';
+import { parseCurrencyNumber } from '../utils/currency.js';
 
 const router = Router();
 
@@ -161,7 +162,7 @@ router.post(['/', '/entry'], async (req, res) => {
 
     const companyId = 'comp_alr_001';
     const day = parseInt(rawDay, 10);
-    const amt = parseFloat(amount);
+    const amt = parseCurrencyNumber(amount, -1);
 
     if (isNaN(amt) || amt < 0) {
       return res.status(400).json({ success: false, error: 'Amount cannot be negative' });
@@ -265,7 +266,7 @@ router.post('/batch', async (req, res) => {
       const day = parseInt(item.day_number || item.day || batchDay, 10);
       if (isNaN(day) || day < 1 || day > maxDays) continue;
 
-      const amt = parseFloat(item.amount);
+      const amt = parseCurrencyNumber(item.amount, -1);
       if (isNaN(amt) || amt < 0) continue;
 
       const pMode = item.payment_mode || defaultPaymentMode;
