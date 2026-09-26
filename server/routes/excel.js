@@ -21,6 +21,15 @@ function colToLetter(col) {
   return letter;
 }
 
+// Helper: Clean currency and number strings (handles "10,000", "₹10,000", etc.)
+function parseCurrencyNumber(val, defaultVal = 0) {
+  if (val === undefined || val === null || val === '') return defaultVal;
+  if (typeof val === 'number') return isNaN(val) ? defaultVal : val;
+  const cleaned = String(val).replace(/[^0-9.-]/g, '');
+  const parsed = parseFloat(cleaned);
+  return isNaN(parsed) ? defaultVal : parsed;
+}
+
 // Setup upload directory for Excel files
 const uploadDir = process.env.VERCEL ? path.resolve('/tmp', 'uploads') : path.resolve('data/uploads');
 try {
@@ -380,7 +389,7 @@ router.post('/preview', upload.single('file'), async (req, res) => {
       const name = row[2] ? String(row[2]).trim() : '';
       const phone = row[3] ? String(row[3]).trim().replace(/[^0-9]/g, '') : '';
       const address = row[4] ? String(row[4]).trim() : '';
-      const principal = row[5] ? parseFloat(row[5]) || 0 : 0;
+      const principal = parseCurrencyNumber(row[5], 0);
 
       // Skip completely empty rows
       if (!name && !phone && principal === 0) continue;
@@ -418,8 +427,8 @@ router.post('/preview', upload.single('file'), async (req, res) => {
       for (let d = 1; d <= totalDays; d++) {
         const val = row[5 + d];
         if (val !== undefined && val !== '' && val !== null) {
-          const amt = parseFloat(val);
-          if (!isNaN(amt) && amt > 0) {
+          const amt = parseCurrencyNumber(val, 0);
+          if (amt > 0) {
             rowCollectionSum += amt;
             dayEntries.push({ day: d, amount: amt });
           }
@@ -517,7 +526,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
       const name = String(row[2]).trim();
       const phone = row[3] ? String(row[3]).trim() : '';
       const address = row[4] ? String(row[4]).trim() : '';
-      const principal = row[5] ? parseFloat(row[5]) : 10000;
+      const principal = parseCurrencyNumber(row[5], 10000);
 
       if (!name) continue;
 
@@ -570,7 +579,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
       for (let d = 1; d <= totalDays; d++) {
         const val = row[5 + d];
         if (val !== undefined && val !== null && val !== '') {
-          const amount = parseFloat(val);
+          const amount = parseCurrencyNumber(val, 0);
           if (amount > 0) {
             const dayPadded = String(d).padStart(2, '0');
             const colDate = `${month_year}-${dayPadded}`;
