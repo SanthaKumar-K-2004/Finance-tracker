@@ -29,12 +29,19 @@ const ALLOWED_ORIGIN_PATTERNS = [
   /^http:\/\/127\.0\.0\.1(:\d+)?$/,
   /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/, // Local WiFi / POS Handhelds
   /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
-  /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}(:\d+)?$/
+  /^http:\/\/172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+  /^https?:\/\/.*\.vercel\.app$/, // All Vercel production & preview deployments
+  /^https?:\/\/.*\.pages\.dev$/
 ];
 
 export function corsOriginCheck(origin, callback) {
   // Allow requests with no origin (like mobile apps, curl, server-to-server, Postman)
   if (!origin) {
+    return callback(null, true);
+  }
+
+  // Always allow *.vercel.app and finance-tracker-alphax
+  if (origin.endsWith('.vercel.app') || origin.includes('finance-tracker-alphax')) {
     return callback(null, true);
   }
 
@@ -46,7 +53,7 @@ export function corsOriginCheck(origin, callback) {
     }
   }
 
-  // Check localhost and private network regex
+  // Check localhost, private network, and Vercel regex
   const isAllowed = ALLOWED_ORIGIN_PATTERNS.some(regex => regex.test(origin));
   if (isAllowed) {
     return callback(null, true);
