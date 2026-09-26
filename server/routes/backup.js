@@ -7,10 +7,12 @@ import { serverCache } from '../utils/cache.js';
 
 const router = Router();
 
-const uploadDir = path.resolve('data/uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
+const uploadDir = process.env.VERCEL ? path.resolve('/tmp', 'uploads') : path.resolve('data/uploads');
+try {
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+} catch (_) {}
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
   filename: (req, file, cb) => cb(null, `db_${Date.now()}_${file.originalname}`)

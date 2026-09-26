@@ -36,3 +36,8 @@ Thumbs.db
 
 # Verification screenshots
 *.png
+
+# Vercel
+.vercel/
+.vercel
+.env*

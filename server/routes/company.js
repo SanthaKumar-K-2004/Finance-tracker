@@ -10,10 +10,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const router = express.Router();
 
-const uploadsDir = path.resolve(__dirname, '../../data/uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
+const uploadsDir = process.env.VERCEL ? path.resolve('/tmp', 'uploads') : path.resolve(__dirname, '../../data/uploads');
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch (_) {}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {

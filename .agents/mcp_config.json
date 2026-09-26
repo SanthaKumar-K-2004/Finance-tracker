@@ -5,6 +5,9 @@
       "args": [
         "/home/santhakumar/Desktop/FINACE PROJECT/server/mcpServer.js"
       ]
+    },
+    "vercel": {
+      "url": "https://mcp.vercel.com/sams-projects-203cf739/finance-tracker"
     }
   }
 }

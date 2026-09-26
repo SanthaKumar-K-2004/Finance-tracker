@@ -13,10 +13,13 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const isTurso = process.env.DATABASE_MODE === 'turso' && process.env.TURSO_DATABASE_URL;
 
 // Ensure data directory exists for local DB and embedded replica
-const dataDir = path.resolve(__dirname, '../data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
+const dataDir = process.env.VERCEL ? path.resolve('/tmp', 'data') : path.resolve(__dirname, '../data');
+try {
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+} catch (_) {}
+
 
 const replicaDbPath = path.resolve(dataDir, 'finance_replica.db');
 
