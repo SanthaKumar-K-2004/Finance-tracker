@@ -226,7 +226,7 @@ export default function ClientCard({
       {(!isCleared || isUnlocked) && (
         <div className="card-quick-collect-section">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+            <span style={{ fontSize: '12px', fontWeight: 750, color: 'var(--text-secondary)' }}>
               {isCleared
                 ? (lang === 'ta' ? 'திருத்த வசூல் உள்ளீடு:' : 'Adjust payment entry:')
                 : (lang === 'ta' ? `நாள் ${todayDay} வசூல் பதிவு:` : `Quick Collect Day ${todayDay}:`)}
@@ -239,56 +239,77 @@ export default function ClientCard({
           </div>
 
           <div className="card-quick-add-bar">
-            <div className="quick-add-input-wrapper">
-              <span className="quick-add-currency">₹</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                className="quick-add-input font-mono"
-                value={inlineAmount}
-                onChange={(e) => setInlineAmount(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleInlineAdd();
-                }}
-                placeholder={lang === 'ta' ? 'தொகை உள்ளிடுக...' : 'Enter amount...'}
-                min="0"
-                aria-label={lang === 'ta' ? 'வசூல் தொகை' : 'Collection amount'}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleInlineAdd}
-              disabled={!inlineAmount || Number(inlineAmount) <= 0}
-              className="btn btn-primary btn-sm quick-add-btn"
-              style={{ opacity: (!inlineAmount || Number(inlineAmount) <= 0) ? 0.6 : 1 }}
-              title={lang === 'ta' ? 'இன்றைய வசூலில் சேர்க்க' : 'Record collection'}
-            >
-              <PlusCircle size={14} />
-              <span>{lang === 'ta' ? 'வசூலி' : 'Collect'}</span>
-            </button>
-
-            {client.remaining > 0 && (
+            {/* Primary Row: High-Speed Amount Entry + Collect Button */}
+            <div className="quick-add-primary-row">
+              <div className="quick-add-input-wrapper">
+                <span className="quick-add-currency">₹</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  className="quick-add-input font-mono"
+                  value={inlineAmount}
+                  onChange={(e) => setInlineAmount(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleInlineAdd();
+                  }}
+                  placeholder={lang === 'ta' ? 'தொகை உள்ளிடுக...' : 'Enter amount...'}
+                  min="0"
+                  aria-label={lang === 'ta' ? 'வசூல் தொகை' : 'Collection amount'}
+                />
+              </div>
               <button
                 type="button"
-                onClick={() => setShowFullConfirm(true)}
-                className="btn btn-secondary btn-sm"
-                style={{ height: '36px', padding: '0 10px', fontSize: '12px', fontWeight: 700, borderColor: 'var(--emerald-primary)', color: 'var(--emerald-text)', background: 'var(--emerald-light)', flexShrink: 0 }}
-                title={t('quick_full_due')}
+                onClick={handleInlineAdd}
+                disabled={!inlineAmount || Number(inlineAmount) <= 0}
+                className="btn btn-primary btn-sm quick-add-btn"
+                style={{ opacity: (!inlineAmount || Number(inlineAmount) <= 0) ? 0.6 : 1 }}
+                title={lang === 'ta' ? 'இன்றைய வசூலில் சேர்க்க' : 'Record collection'}
               >
-                {lang === 'ta' ? 'முழு நிலுவை' : 'Full Due'}
+                <PlusCircle size={15} />
+                <span>{lang === 'ta' ? 'வசூலி' : 'Collect'}</span>
               </button>
-            )}
+            </div>
 
-            <button
-              type="button"
-              onClick={() => onOpenModal(client)}
-              className="btn btn-secondary btn-sm"
-              style={{ height: '36px', padding: '0 10px', flexShrink: 0 }}
-              title={t('quick_custom')}
-            >
-              <PlusCircle size={14} />
-            </button>
+            {/* Secondary Row: Quick Actions (Full Due & Custom Day Modal) */}
+            <div className="quick-add-secondary-row">
+              {client.remaining > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowFullConfirm(true)}
+                  className="quick-secondary-chip full-due-chip"
+                  title={t('quick_full_due')}
+                >
+                  <CheckCircle2 size={13} />
+                  <span>{lang === 'ta' ? `முழு நிலுவை (₹${client.remaining.toLocaleString('en-IN')})` : `Full Due (₹${client.remaining.toLocaleString('en-IN')})`}</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => onOpenModal(client)}
+                className="quick-secondary-chip custom-modal-chip"
+                title={t('quick_custom')}
+              >
+                <SlidersHorizontal size={13} />
+                <span>{lang === 'ta' ? 'கூடுதல் நாள்' : 'Custom Day'}</span>
+              </button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* Primary Milestone Action for Cleared Loans: Prominent Full-Width CTA */}
+      {isCleared && (
+        <div className="card-cleared-action-section">
+          <button
+            type="button"
+            onClick={() => onCloseClient(client.cycle_id, client.client_id, client.name)}
+            className="btn-close-loan-cta"
+            title={lang === 'ta' ? 'இந்த தவணையை நிறைவு செய்து காப்பகப்படுத்துக' : 'Close and archive this loan cycle'}
+          >
+            <CheckCircle2 size={18} />
+            <span>{lang === 'ta' ? 'கடனை நிறைவு செய்க (Close Loan)' : 'Close & Archive Loan'}</span>
+          </button>
         </div>
       )}
 
@@ -354,13 +375,13 @@ export default function ClientCard({
         </div>
       )}
 
-      {/* Bottom Action Buttons */}
+      {/* Bottom Action Buttons: Balanced 5-action toolbar with guaranteed zero overflow */}
       <div className="card-actions-row">
         <button
           type="button"
           onClick={() => onOpenReceipt({ ...client, current_payment: todayAmount, selected_day: todayDay }, 'whatsapp')}
-          className="btn btn-secondary btn-sm"
-          style={{ flex: 1, borderColor: '#25D366', color: '#16A34A', height: '36px', fontWeight: 700 }}
+          className="btn btn-secondary btn-sm card-action-whatsapp"
+          title={lang === 'ta' ? 'வாட்ஸ்அப் ரசீது' : 'WhatsApp Receipt'}
         >
           <MessageSquare size={15} />
           <span>{lang === 'ta' ? 'வாட்ஸ்அப்' : 'WhatsApp'}</span>
@@ -369,9 +390,9 @@ export default function ClientCard({
         <button
           type="button"
           onClick={() => onOpenReceipt({ ...client, current_payment: todayAmount, selected_day: todayDay }, 'print')}
-          className="btn btn-secondary btn-sm"
-          style={{ height: '36px', padding: '0 10px' }}
+          className="btn btn-secondary btn-sm card-action-btn-icon"
           title={t('btn_print')}
+          aria-label={t('btn_print')}
         >
           <Printer size={15} />
         </button>
@@ -379,9 +400,9 @@ export default function ClientCard({
         <button
           type="button"
           onClick={() => onEditClient && onEditClient(client)}
-          className="btn btn-secondary btn-sm"
-          style={{ height: '36px', padding: '0 10px' }}
+          className="btn btn-secondary btn-sm card-action-btn-icon"
           title={lang === 'ta' ? 'வாடிக்கையாளர் திருத்தம்' : 'Edit Borrower'}
+          aria-label={lang === 'ta' ? 'வாடிக்கையாளர் திருத்தம்' : 'Edit Borrower'}
         >
           <Edit size={15} />
         </button>
@@ -389,9 +410,10 @@ export default function ClientCard({
         <button
           type="button"
           onClick={() => onResetClient && onResetClient(client)}
-          className="btn btn-secondary btn-sm"
-          style={{ height: '36px', padding: '0 10px', color: 'var(--amber-primary)', borderColor: 'var(--amber-border)' }}
+          className="btn btn-secondary btn-sm card-action-btn-icon"
+          style={{ color: 'var(--amber-primary)', borderColor: 'var(--amber-border)' }}
           title={lang === 'ta' ? 'வசூல் மீட்டமை (0 ஆக்குக)' : 'Reset Collections to ₹0'}
+          aria-label={lang === 'ta' ? 'வசூல் மீட்டமை' : 'Reset Collections'}
         >
           <RotateCcw size={15} />
         </button>
@@ -399,35 +421,13 @@ export default function ClientCard({
         <button
           type="button"
           onClick={() => onDeleteClient && onDeleteClient(client.client_id, client.name, client.cycle_id)}
-          className="btn btn-secondary btn-sm"
-          style={{ height: '36px', padding: '0 10px', color: 'var(--rose-primary)' }}
+          className="btn btn-secondary btn-sm card-action-btn-icon"
+          style={{ color: 'var(--rose-primary)' }}
           title={lang === 'ta' ? 'நீக்குக' : 'Delete Borrower'}
+          aria-label={lang === 'ta' ? 'நீக்குக' : 'Delete Borrower'}
         >
           <Trash2 size={15} />
         </button>
-
-        {isCleared && (
-          <button
-            type="button"
-            onClick={() => onCloseClient(client.cycle_id, client.client_id, client.name)}
-            className="btn btn-sm"
-            style={{
-              background: 'var(--emerald-primary)',
-              color: '#FFFFFF',
-              border: 'none',
-              height: '36px',
-              padding: '0 12px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontWeight: 700,
-              boxShadow: '0 2px 4px rgba(5, 150, 105, 0.25)'
-            }}
-          >
-            <CheckCircle2 size={16} />
-            <span>{t('btn_close_loan')}</span>
-          </button>
-        )}
       </div>
     </div>
   );

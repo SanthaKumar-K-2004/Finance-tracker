@@ -1213,11 +1213,23 @@ html, body {
   user-select: none;
 }
 
-/* Mobile Field Cards */
 .client-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
   gap: 18px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .client-cards-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .mobile-client-card {
+    padding: 14px;
+    border-radius: 12px;
+  }
 }
 
 .mobile-client-card {
@@ -1230,6 +1242,10 @@ html, body {
   gap: 14px;
   box-shadow: 0 2px 5px -1px rgba(0, 0, 0, 0.05), 0 1px 3px -1px rgba(0, 0, 0, 0.03);
   position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
+  max-width: 100%;
+  width: 100%;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 
@@ -1453,8 +1469,83 @@ html, body {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding-top: 4px;
+  padding-top: 8px;
   border-top: 1px solid var(--border-subtle);
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.card-action-btn-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card-action-whatsapp {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 750;
+  border-color: #25D366 !important;
+  color: #16A34A !important;
+}
+
+[data-theme='dark'] .card-action-whatsapp {
+  border-color: rgba(37, 211, 102, 0.4) !important;
+  color: #4ADE80 !important;
+  background: rgba(37, 211, 102, 0.08) !important;
+}
+
+/* Dedicated Milestone CTA for Cleared Loans */
+.card-cleared-action-section {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.btn-close-loan-cta {
+  width: 100%;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.35);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 14px;
+  box-sizing: border-box;
+}
+
+.btn-close-loan-cta:hover {
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-close-loan-cta:active {
+  transform: scale(0.98);
 }
 
 /* ==========================================================================
@@ -1507,15 +1598,25 @@ html, body {
   opacity: 0.5;
 }
 
+/* Balanced 2-Row Quick Add Bar */
 .card-quick-add-bar {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-  padding: 4px;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 6px;
   background: var(--bg-surface-hover);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.quick-add-primary-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
 }
 
 .quick-add-input-wrapper {
@@ -1523,6 +1624,7 @@ html, body {
   flex: 1;
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
 .quick-add-currency {
@@ -1537,7 +1639,7 @@ html, body {
 
 .quick-add-input {
   width: 100%;
-  height: 36px;
+  height: 38px;
   padding-left: 26px;
   padding-right: 8px;
   border: 1px solid var(--border-strong);
@@ -1548,6 +1650,7 @@ html, body {
   font-weight: 700;
   outline: none;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-sizing: border-box;
 }
 
 .quick-add-input:focus {
@@ -1556,13 +1659,61 @@ html, body {
 }
 
 .quick-add-btn {
-  height: 36px;
+  height: 38px;
   padding: 0 14px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 750;
   white-space: nowrap;
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
   gap: 5px;
+}
+
+.quick-add-secondary-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.quick-secondary-chip {
+  flex: 1;
+  height: 30px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+
+.quick-secondary-chip.full-due-chip {
+  border-color: var(--emerald-primary);
+  background: var(--emerald-light);
+  color: var(--emerald-text);
+}
+
+.quick-secondary-chip.full-due-chip:hover {
+  background: var(--emerald-primary);
+  color: #FFFFFF;
+}
+
+.quick-secondary-chip.custom-modal-chip:hover {
+  border-color: var(--indigo-primary);
+  background: var(--indigo-light);
+  color: var(--indigo-text);
 }
 
 /* ==========================================================================
