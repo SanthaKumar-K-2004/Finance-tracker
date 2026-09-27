@@ -23,33 +23,38 @@ try {
 
 const replicaDbPath = path.resolve(dataDir, 'finance_replica.db');
 
+const localDbFile = path.resolve(dataDir, 'finance.db');
 const localConfig = {
-  url: `file:${path.resolve(dataDir, 'finance.db')}`
+  url: `file:${localDbFile}`
 };
+
+// On Vercel / serverless, Turso Cloud should use https:// for optimal fetch performance without WS overhead
+const primaryUrl = isTurso
+  ? (process.env.VERCEL ? process.env.TURSO_DATABASE_URL.replace(/^libsql:\/\//, 'https://') : process.env.TURSO_DATABASE_URL)
+  : localConfig.url;
 
 console.log(`🔌 Database Mode: ${isTurso ? 'Turso Cloud (Managed distributed DB with SWR In-Memory Engine)' : 'Local SQLite'}`);
 if (isTurso) {
-  console.log(`🌐 Turso Primary: ${process.env.TURSO_DATABASE_URL}`);
+  console.log(`🌐 Turso Primary: ${primaryUrl}`);
 } else {
   console.log(`📁 Local DB: ${localConfig.url}`);
 }
 
 const clientConfig = isTurso
   ? {
-      url: process.env.TURSO_DATABASE_URL,
+      url: primaryUrl,
       authToken: process.env.TURSO_AUTH_TOKEN
     }
   : localConfig;
 
 const primaryClient = createClient(clientConfig);
-const fallbackClient = isTurso ? createClient(localConfig) : null;
-let usingFallback = false;
+
+// Fallback client is ONLY enabled for local offline environments where the local DB file actually exists
+const hasLocalDb = !process.env.VERCEL && fs.existsSync(localDbFile);
+const fallbackClient = (isTurso && hasLocalDb) ? createClient(localConfig) : null;
 
 export const db = {
   async execute(stmt) {
-    if (usingFallback && fallbackClient) {
-      return fallbackClient.execute(stmt);
-    }
     try {
       return await primaryClient.execute(stmt);
     } catch (err) {
@@ -61,17 +66,13 @@ export const db = {
         err.message.includes('ENOTFOUND')
       );
       if (isTurso && isDnsOrNetwork && fallbackClient) {
-        console.warn('⚠️ Turso Cloud connection failed (getaddrinfo/offline). Gracefully routing to Local SQLite (data/finance.db)...');
-        usingFallback = true;
+        console.warn('⚠️ Turso Cloud connection failed (getaddrinfo/offline). Routing this query to Local SQLite (data/finance.db)...');
         return fallbackClient.execute(stmt);
       }
       throw err;
     }
   },
   async batch(stmts) {
-    if (usingFallback && fallbackClient) {
-      return fallbackClient.batch(stmts);
-    }
     try {
       return await primaryClient.batch(stmts);
     } catch (err) {
@@ -83,8 +84,7 @@ export const db = {
         err.message.includes('ENOTFOUND')
       );
       if (isTurso && isDnsOrNetwork && fallbackClient) {
-        console.warn('⚠️ Turso Cloud batch failed (getaddrinfo/offline). Gracefully routing to Local SQLite (data/finance.db)...');
-        usingFallback = true;
+        console.warn('⚠️ Turso Cloud batch failed (getaddrinfo/offline). Routing this batch to Local SQLite (data/finance.db)...');
         return fallbackClient.batch(stmts);
       }
       throw err;
@@ -122,6 +122,11 @@ export async function query(sql, args = []) {
       lastErr = err;
       const isTransient = err.message && (
         err.message.includes('fetch failed') ||
+        err.message.includes('getaddrinfo') ||
+        err.message.includes('EAI_AGAIN') ||
+        err.code === 'EAI_AGAIN' ||
+        err.message.includes('ENOTFOUND') ||
+        err.message.includes('ECONNREFUSED') ||
         err.message.includes('timed out') ||
         err.message.includes('timeout') ||
         err.message.includes('ECONNRESET') ||
@@ -149,6 +154,11 @@ export async function execute(sql, args = []) {
       lastErr = err;
       const isTransient = err.message && (
         err.message.includes('fetch failed') ||
+        err.message.includes('getaddrinfo') ||
+        err.message.includes('EAI_AGAIN') ||
+        err.code === 'EAI_AGAIN' ||
+        err.message.includes('ENOTFOUND') ||
+        err.message.includes('ECONNREFUSED') ||
         err.message.includes('timed out') ||
         err.message.includes('timeout') ||
         err.message.includes('ECONNRESET') ||
@@ -175,6 +185,12 @@ export async function batch(statements) {
       lastErr = err;
       const isTransient = err.message && (
         err.message.includes('fetch failed') ||
+        err.message.includes('getaddrinfo') ||
+        err.message.includes('EAI_AGAIN') ||
+        err.code === 'EAI_AGAIN' ||
+        err.message.includes('ENOTFOUND') ||
+        err.message.includes('ECONNREFUSED') ||
+        err.message.includes('timed out') ||
         err.message.includes('timeout') ||
         err.message.includes('ECONNRESET') ||
         err.message.includes('500') ||
