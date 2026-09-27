@@ -15,7 +15,8 @@ import {
   Calendar, 
   Clock, 
   Check,
-  RotateCcw
+  RotateCcw,
+  SlidersHorizontal
 } from 'lucide-react';
 
 export default function ClientCard({
