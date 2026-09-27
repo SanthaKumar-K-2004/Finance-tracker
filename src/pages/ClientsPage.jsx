@@ -77,15 +77,27 @@ export default function ClientsPage({ activeMonth }) {
     }
   };
 
-  const filtered = clients.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    (c.phone && c.phone.includes(search)) ||
-    (c.address && c.address.toLowerCase().includes(search.toLowerCase())) ||
-    String(c.sl_no).includes(search)
-  );
+  const [filterSegment, setFilterSegment] = useState('all'); // 'all' | 'active' | 'cleared' | 'with_phone'
+
+  const filtered = clients.filter(c => {
+    const matchesSearch = 
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      (c.phone && c.phone.includes(search)) ||
+      (c.address && c.address.toLowerCase().includes(search.toLowerCase())) ||
+      String(c.sl_no).includes(search);
+    if (!matchesSearch) return false;
+
+    const principal = c.principal || 10000;
+    const collected = c.total_collected || 0;
+    const isCleared = collected >= principal && principal > 0;
+    if (filterSegment === 'active') return !isCleared;
+    if (filterSegment === 'cleared') return isCleared;
+    if (filterSegment === 'with_phone') return !!c.phone;
+    return true;
+  });
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
       {/* Header & Actions */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -124,6 +136,42 @@ export default function ClientsPage({ activeMonth }) {
             <span className="mobile-only">{lang === 'ta' ? '+ சேர்க்க' : '+ Add'}</span>
           </button>
         </div>
+      </div>
+
+      {/* Segment Filter Pills */}
+      <div className="mobile-chips-scroll" style={{ display: 'flex', alignItems: 'center', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }}>
+        <button
+          type="button"
+          onClick={() => setFilterSegment('all')}
+          className={`chip-btn ${filterSegment === 'all' ? 'active' : ''}`}
+          style={{ minWidth: '80px', height: '32px', fontSize: '12px' }}
+        >
+          {lang === 'ta' ? 'அனைத்தும்' : 'All'} ({clients.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterSegment('active')}
+          className={`chip-btn ${filterSegment === 'active' ? 'active' : ''}`}
+          style={{ minWidth: '100px', height: '32px', fontSize: '12px' }}
+        >
+          {lang === 'ta' ? 'நடப்பு தவணை' : 'Active'} ({clients.filter(c => ((c.total_collected || 0) < (c.principal || 10000))).length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterSegment('cleared')}
+          className={`chip-btn ${filterSegment === 'cleared' ? 'active' : ''}`}
+          style={{ minWidth: '100px', height: '32px', fontSize: '12px' }}
+        >
+          {lang === 'ta' ? 'நிறைவுற்றவை' : 'Cleared'} ({clients.filter(c => ((c.total_collected || 0) >= (c.principal || 10000))).length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setFilterSegment('with_phone')}
+          className={`chip-btn ${filterSegment === 'with_phone' ? 'active' : ''}`}
+          style={{ minWidth: '95px', height: '32px', fontSize: '12px' }}
+        >
+          {lang === 'ta' ? 'வாட்ஸ்அப் உள்ளவை' : 'With Phone'} ({clients.filter(c => !!c.phone).length})
+        </button>
       </div>
 
       {/* Directory Table (Desktop View) */}

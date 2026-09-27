@@ -274,6 +274,7 @@ export default function LedgerGrid({
                           <input
                             id={`cell-${rIdx}-${day}`}
                             type="number"
+                            inputMode="numeric"
                             min="0"
                             step="10"
                             readOnly={isCellLocked}

@@ -1,24 +1,29 @@
-# Learning Proposal: Field Operations Safety & Financial Entry Guardrails
+# 🧠 Learning Proposal: Microfinance UI/UX Design Psychology & Financial Trust Guardrails
 
-## Rationale
-During field microfinance operations, agents using mobile Card View on handheld devices or while traveling face unique usability and safety risks:
-1. Accidental taps on "Full Due / Settle" can inadvertently clear a multi-thousand rupee loan balance with no recovery mechanism.
-2. Silently falling back to calculated amounts when an input is submitted blank leads to unintended balance adjustments.
-3. Viewing historical/future months with a hardcoded `todayDay = new Date().getDate()` causes incorrect day indexing.
+## 1. Classification
+- **Type**: Workspace Customization Rule & Skill Extension
+- **Target Location**: `.agents/skills/daily-finance-auditor/` and `.agents/rules/financial-ui-trust.md`
 
-## Proposed Guidelines & Architectural Guardrails
+## 2. Rationale
+When building digital microfinance and daily ledger software for field operations and enterprise shop management:
+1. **Financial Trust & Cognitive Authority**:
+   - Money and debt tracking requires absolute clarity, calm authority, and high perceived legitimacy.
+   - Saturated neon colors, purple/pink "AI hype" gradients, or playful bouncy animations destroy user trust and cause visual exhaustion in high-stress financial bookkeeping.
+   - Authority Navy (`#0F172A`, `#1E3A8A`) combined with Emerald Jade (`#059669`) for positive income, Ruby Crimson (`#DC2626`) for overdue debt, and Warm Brass (`#A16207`) for recovery targets matches institutional banking psychology.
+2. **Tabular Numerals & Optical Alignment**:
+   - Currency digits must never jitter or oscillate horizontally when values change.
+   - Every numerical field must enforce `font-variant-numeric: tabular-nums` or utilize a monospace/tabular font (`JetBrains Mono`).
+3. **Field Ergonomics & Mobile Ruggedness**:
+   - Agents collecting cash outdoors or on vehicles need high-contrast views, single-hand thumb navigation, instant numeric keypad popups (`inputMode="numeric"`), and minimum 44×44px touch targets.
+   - 31-day horizontal tables must always anchor borrower Sl.No and Name as sticky frozen columns so context is never lost during horizontal swipe.
 
-### 1. Financial Settlement Confirmation & Reversal
-- Any action that settles a client balance to zero ("முழு நிலுவை / Full Due") or modifies multiple days MUST provide:
-  - An inline confirmation guard prompt before state mutation.
-  - A transient (8-second) Undo floating action toast allowing instantaneous 1-click reversal to the exact prior ledger balance.
-  - An in-card revert button on any day with logged collection (`amount > 0`).
+## 3. Reusable Rules to Persist
 
-### 2. Input Validation Over Silent Defaults
-- An empty collection input MUST NOT secretly inject an implied daily quota (`expectedDaily`). If blank, the action button is disabled or triggers a validation hint, ensuring explicit user intent.
-
-### 3. Progressive Hardware Integration (Bluetooth & Web Audio)
-- For direct hardware features (Web Bluetooth ESC/POS printing, Web Audio synthesizer):
-  - Progressive enhancement: check `navigator.bluetooth` capability before invoking hardware APIs.
-  - Seamless fallback: if unsupported or cancelled, route cleanly to the standard system browser print dialog (`window.print()`).
-  - Self-contained audio: use browser `AudioContext` oscillators for zero-dependency offline operation.
+```markdown
+### Financial UI/UX Trust & Ergonomics Rules:
+1. **Never use AI-cliché purple/pink gradient borders or glowing neon buttons** in financial ledgers.
+2. **Always enforce `font-variant-numeric: tabular-nums`** across all monetary tables, balance badges, and progress counters.
+3. **Strict Bilingual Pairing**: Always pair English geometric sans (`Plus Jakarta Sans` / `Inter`) with clean Tamil typography (`Noto Sans Tamil` / `Mukta Malar`) with identical vertical alignment and balanced leading (1.5 - 1.6).
+4. **Frozen Columns on Dense Ledgers**: Any horizontal ledger with >7 date columns must pin borrower identity columns on the left.
+5. **Mobile Thumb Dock**: Provide a persistent bottom navigation bar on screens `< 768px` for primary workflows (Ledger, Dashboard, Borrowers, Cash Handover).
+```

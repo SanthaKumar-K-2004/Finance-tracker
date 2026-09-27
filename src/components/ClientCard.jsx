@@ -204,6 +204,24 @@ export default function ClientCard({
         </div>
       </div>
 
+      {/* Visual Loan Repayment Progress Bar */}
+      <div className="card-loan-progress-wrap">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px', fontSize: '11px', fontWeight: 700 }}>
+          <span style={{ color: 'var(--text-secondary)' }}>
+            {lang === 'ta' ? 'தவணை முன்னேற்றம்' : 'Repayment Progress'}
+          </span>
+          <span className="font-mono" style={{ color: isCleared ? 'var(--emerald-primary)' : 'var(--text-primary)' }}>
+            {Math.min(100, Math.round(((client.total_collected || 0) / (client.principal || 1)) * 100))}%
+          </span>
+        </div>
+        <div className="card-loan-progress-track">
+          <div
+            className={`card-loan-progress-fill ${isCleared ? 'progress-fill-cleared' : ''}`}
+            style={{ width: `${Math.min(100, Math.max(0, Math.round(((client.total_collected || 0) / (client.principal || 1)) * 100)))}%` }}
+          />
+        </div>
+      </div>
+
       {/* Streamlined Direct Quick Collection Bar */}
       {(!isCleared || isUnlocked) && (
         <div className="card-quick-collect-section">
@@ -225,6 +243,7 @@ export default function ClientCard({
               <span className="quick-add-currency">₹</span>
               <input
                 type="number"
+                inputMode="numeric"
                 className="quick-add-input font-mono"
                 value={inlineAmount}
                 onChange={(e) => setInlineAmount(e.target.value)}
