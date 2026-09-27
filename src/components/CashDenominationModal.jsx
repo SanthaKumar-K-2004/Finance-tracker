@@ -72,15 +72,27 @@ export default function CashDenominationModal({ onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+      <div 
+        className="modal-content" 
+        style={{ maxWidth: '480px' }} 
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cash-modal-title"
+      >
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Calculator size={20} color="var(--emerald-primary)" />
-            <h2 className="modal-title">
+            <h2 id="cash-modal-title" className="modal-title">
               {lang === 'ta' ? 'மாலை நேர பணக் கணக்கீடு (Cash Handover)' : 'Evening Cash Handover & Settlement'}
             </h2>
           </div>
-          <button type="button" onClick={onClose} className="btn-icon">
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="btn-icon"
+            aria-label={lang === 'ta' ? 'பணக் கணக்கீட்டை மூடுக' : 'Close cash handover dialog'}
+          >
             <X size={18} />
           </button>
         </div>
@@ -100,8 +112,9 @@ export default function CashDenominationModal({ onClose }) {
             <>
               <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
                 <div style={{ flex: 1 }}>
-                  <label className="form-label">{lang === 'ta' ? 'வசூல் செய்தவர்' : 'Agent Name'}</label>
+                  <label htmlFor="cash-agent-name" className="form-label">{lang === 'ta' ? 'வசூல் செய்தவர்' : 'Agent Name'}</label>
                   <input
+                    id="cash-agent-name"
                     type="text"
                     className="form-input"
                     value={agentName}
@@ -140,6 +153,7 @@ export default function CashDenominationModal({ onClose }) {
                               type="number"
                               min="0"
                               className="form-input"
+                              aria-label={`Count for ₹${denom} notes`}
                               style={{ width: '80px', textAlign: 'center', height: '32px', padding: '4px', fontFamily: 'var(--font-mono)', fontWeight: 700 }}
                               value={count === 0 ? '' : count}
                               placeholder="0"

@@ -31,7 +31,8 @@ export default function TargetProgressRing({ activeMonth, refreshTrigger }) {
     let isMounted = true;
     const fetchTargetData = async () => {
       try {
-        const res = await fetch(`/api/reports/dashboard?month_year=${activeMonth || '2026-05'}`);
+        const fallbackMonth = new Date().toISOString().slice(0, 7);
+        const res = await fetch(`/api/reports/dashboard?month_year=${activeMonth || fallbackMonth}`);
         const json = await res.json();
         if (json.success && isMounted) {
           setData(json.data);

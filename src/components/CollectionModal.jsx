@@ -26,15 +26,29 @@ export default function CollectionModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+      <div 
+        className="modal-content" 
+        style={{ maxWidth: '420px' }} 
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="collection-modal-title"
+      >
         <div className="modal-header">
           <div>
-            <h2 className="modal-title">{lang === 'ta' ? 'வசூல் பதிவு செய்தல்' : 'Record Collection Entry'}</h2>
+            <h2 id="collection-modal-title" className="modal-title">
+              {lang === 'ta' ? 'வசூல் பதிவு செய்தல்' : 'Record Collection Entry'}
+            </h2>
             <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
               {client.name} ({client.sl_no})
             </p>
           </div>
-          <button type="button" onClick={onClose} className="btn-icon">
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="btn-icon"
+            aria-label={lang === 'ta' ? 'வசூல் சாளரத்தை மூடுக' : 'Close collection modal'}
+          >
             <X size={18} />
           </button>
         </div>
@@ -59,8 +73,11 @@ export default function CollectionModal({
 
             {/* Day Selector */}
             <div className="form-group">
-              <label className="form-label">{lang === 'ta' ? `தேதி / நாள் (Day 1 - ${totalDays})` : `Collection Day (1 - ${totalDays})`}</label>
+              <label htmlFor="collection-day-select" className="form-label">
+                {lang === 'ta' ? `தேதி / நாள் (Day 1 - ${totalDays})` : `Collection Day (1 - ${totalDays})`}
+              </label>
               <select
+                id="collection-day-select"
                 className="form-select"
                 value={day}
                 onChange={e => {
@@ -79,12 +96,15 @@ export default function CollectionModal({
 
             {/* Amount Input */}
             <div className="form-group">
-              <label className="form-label">{lang === 'ta' ? 'வசூல் தொகை (Amount in ₹)' : 'Collection Amount (₹)'}</label>
+              <label htmlFor="collection-amount-input" className="form-label">
+                {lang === 'ta' ? 'வசூல் தொகை (Amount in ₹)' : 'Collection Amount (₹)'}
+              </label>
               <div style={{ position: 'relative' }}>
                 <span style={{ position: 'absolute', left: '12px', top: '10px', fontSize: '16px', fontWeight: 700, color: 'var(--text-muted)' }}>
                   ₹
                 </span>
                 <input
+                  id="collection-amount-input"
                   type="number"
                   min="0"
                   step="10"
@@ -158,8 +178,11 @@ export default function CollectionModal({
 
             {/* Note */}
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">{lang === 'ta' ? 'குறிப்பு (Notes - விருப்பத்தேர்வு)' : 'Notes (Optional)'}</label>
+              <label htmlFor="collection-notes-input" className="form-label">
+                {lang === 'ta' ? 'குறிப்பு (Notes - விருப்பத்தேர்வு)' : 'Notes (Optional)'}
+              </label>
               <input
+                id="collection-notes-input"
                 type="text"
                 className="form-input"
                 value={notes}

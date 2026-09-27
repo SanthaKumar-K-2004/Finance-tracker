@@ -78,6 +78,7 @@ export default function ClosedClientsPage() {
             className="form-input"
             style={{ paddingLeft: '34px', height: '38px' }}
             placeholder={t('search_placeholder')}
+            aria-label={t('search_placeholder') || 'Search closed loans'}
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -154,6 +155,7 @@ export default function ClosedClientsPage() {
                           className="btn-icon"
                           style={{ padding: '4px', color: '#25D366' }}
                           title={t('btn_whatsapp')}
+                          aria-label={t('btn_whatsapp') || 'WhatsApp'}
                         >
                           <MessageSquare size={14} />
                         </button>
@@ -174,6 +176,7 @@ export default function ClosedClientsPage() {
                           className="btn-icon"
                           style={{ padding: '4px' }}
                           title={t('btn_print')}
+                          aria-label={t('btn_print') || 'Print receipt'}
                         >
                           <Printer size={14} />
                         </button>
@@ -183,6 +186,7 @@ export default function ClosedClientsPage() {
                           className="btn btn-secondary btn-sm"
                           style={{ padding: '2px 8px', fontSize: '11px', height: '26px' }}
                           title={lang === 'ta' ? 'தவணையை மீண்டும் திறக்க' : 'Reopen Thavanai'}
+                          aria-label={lang === 'ta' ? 'தவணையை மீண்டும் திறக்க' : 'Reopen Thavanai'}
                         >
                           <RotateCcw size={12} />
                           <span>{lang === 'ta' ? 'மீட்டெடு' : 'Reopen'}</span>

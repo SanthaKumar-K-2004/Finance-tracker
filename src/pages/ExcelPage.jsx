@@ -23,7 +23,8 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
 
-  const [yearStr, monthStr] = (activeMonth || '2026-05').split('-');
+  const activeMonthFallback = activeMonth || new Date().toISOString().slice(0, 7);
+  const [yearStr, monthStr] = activeMonthFallback.split('-');
   const yNum = parseInt(yearStr, 10);
   const mNum = parseInt(monthStr, 10);
   const monthDays = (yNum && mNum) ? new Date(yNum, mNum, 0).getDate() : 31;
@@ -241,6 +242,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
               id="excel-file-picker"
               type="file"
               accept=".xlsx, .xls"
+              aria-label={lang === 'ta' ? 'எக்செல் கோப்பை தேர்ந்தெடுக்கவும்' : 'Upload Excel Register File'}
               style={{ display: 'none' }}
               onChange={(e) => {
                 if (e.target.files && e.target.files[0]) {

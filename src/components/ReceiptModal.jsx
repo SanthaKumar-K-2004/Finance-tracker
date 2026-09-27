@@ -405,18 +405,31 @@ Contact: ${shopPhone}
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '500px' }} onClick={e => e.stopPropagation()}>
+      <div 
+        className="modal-content" 
+        style={{ maxWidth: '500px' }} 
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="receipt-modal-title"
+      >
         {/* Modal Header */}
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {mode === 'whatsapp' ? <MessageSquare size={18} color="#25D366" /> : <Printer size={18} />}
-            <h2 className="modal-title">
+            <h2 id="receipt-modal-title" className="modal-title">
               {receiptType === 'disbursement'
                 ? (receiptLang === 'ta' ? 'புதிய தவணை சீட்டு (New Thavanai Slip)' : 'New Thavanai Slip')
                 : (receiptLang === 'ta' ? 'தவணை வரவு ரசீது (Thavanai Receipt)' : 'Thavanai Collection Receipt')}
             </h2>
           </div>
-          <button type="button" onClick={onClose} className="btn-icon" title="Close">
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="btn-icon" 
+            title="Close"
+            aria-label={receiptLang === 'ta' ? 'ரசீதை மூடுக' : 'Close receipt dialog'}
+          >
             <X size={18} />
           </button>
         </div>

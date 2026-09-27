@@ -321,12 +321,14 @@ export default function Dashboard({ activeMonth }) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={lang === 'ta' ? 'வாடிக்கையாளர் பெயர், எண், வரிசை எண் அல்லது ஊர் தேடுக...' : 'Search by borrower name, phone, S.No, or village...'}
+            aria-label={lang === 'ta' ? 'வாடிக்கையாளர் பெயர், எண் அல்லது ஊர் தேடுக' : 'Search by borrower name, phone, or village'}
             style={{ paddingLeft: '38px', paddingRight: searchQuery ? '36px' : '12px' }}
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
+              aria-label={lang === 'ta' ? 'தேடலை அழிக்க' : 'Clear search'}
               style={{
                 position: 'absolute',
                 right: '10px',
@@ -837,6 +839,7 @@ export default function Dashboard({ activeMonth }) {
                           className="btn-icon"
                           style={{ width: '28px', height: '28px', padding: 0, borderRadius: 'var(--radius-sm)' }}
                           title="Call"
+                          aria-label={lang === 'ta' ? `${client.name} அவர்களை அழைக்க` : `Call ${client.name}`}
                         >
                           <Phone size={13} color="var(--indigo-primary)" />
                         </a>
@@ -853,6 +856,7 @@ export default function Dashboard({ activeMonth }) {
                         className="btn-icon"
                         style={{ width: '28px', height: '28px', padding: 0, borderRadius: 'var(--radius-sm)', color: '#25D366' }}
                         title="WhatsApp Reminder"
+                        aria-label={lang === 'ta' ? `${client.name} அவர்களுக்கு வாட்ஸ்அப் நினைவூட்டல்` : `WhatsApp reminder for ${client.name}`}
                       >
                         <MessageSquare size={13} />
                       </button>
@@ -988,6 +992,7 @@ export default function Dashboard({ activeMonth }) {
                             className="btn-icon"
                             style={{ width: '28px', height: '28px', padding: 0, borderRadius: 'var(--radius-sm)' }}
                             title="Call"
+                            aria-label={lang === 'ta' ? `${def.name} அவர்களை அழைக்க` : `Call ${def.name}`}
                           >
                             <Phone size={13} color="var(--indigo-primary)" />
                           </a>
@@ -1004,6 +1009,7 @@ export default function Dashboard({ activeMonth }) {
                           className="btn-icon"
                           style={{ width: '28px', height: '28px', padding: 0, borderRadius: 'var(--radius-sm)', color: '#25D366' }}
                           title="WhatsApp Reminder"
+                          aria-label={lang === 'ta' ? `${def.name} அவர்களுக்கு வாட்ஸ்அப் நினைவூட்டல்` : `WhatsApp reminder for ${def.name}`}
                         >
                           <MessageSquare size={13} />
                         </button>

@@ -120,17 +120,29 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+      <div 
+        className="modal-content" 
+        style={{ maxWidth: '480px' }} 
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="client-modal-title"
+      >
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <UserPlus size={20} color="var(--emerald-primary)" />
-            <h2 className="modal-title" style={{ fontSize: '18px', fontWeight: 800 }}>
+            <h2 id="client-modal-title" className="modal-title" style={{ fontSize: '18px', fontWeight: 800 }}>
               {clientToEdit
                 ? (lang === 'ta' ? 'வாடிக்கையாளர் திருத்தம் (Edit Borrower)' : 'Edit Borrower')
                 : (lang === 'ta' ? 'புதிய வாடிக்கையாளர் சேர்த்தல்' : 'Add New Borrower')}
             </h2>
           </div>
-          <button type="button" onClick={onClose} className="btn-icon">
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="btn-icon"
+            aria-label={lang === 'ta' ? 'படிவத்தை மூடுக' : 'Close borrower dialog'}
+          >
             <X size={20} />
           </button>
         </div>
@@ -158,10 +170,11 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
             {/* Sl.No and Name */}
             <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '10px' }}>
               <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700 }}>
+                <label htmlFor="client-form-slno" className="form-label" style={{ fontWeight: 700 }}>
                   {lang === 'ta' ? 'வ.எண் (Sl.No)' : 'Sl.No'}
                 </label>
                 <input
+                  id="client-form-slno"
                   type="number"
                   className="form-input font-mono"
                   style={{ height: '42px', fontSize: '15px', fontWeight: 700 }}
@@ -172,10 +185,11 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
               </div>
 
               <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700 }}>
+                <label htmlFor="client-form-name" className="form-label" style={{ fontWeight: 700 }}>
                   {lang === 'ta' ? 'வாடிக்கையாளர் பெயர் *' : 'Borrower Name *'}
                 </label>
                 <input
+                  id="client-form-name"
                   type="text"
                   required
                   className="form-input"
@@ -190,10 +204,11 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
             {/* Phone and Address */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
               <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700 }}>
+                <label htmlFor="client-form-phone" className="form-label" style={{ fontWeight: 700 }}>
                   {lang === 'ta' ? 'தொலைபேசி எண்' : 'Phone Number'}
                 </label>
                 <input
+                  id="client-form-phone"
                   type="tel"
                   className="form-input font-mono"
                   style={{ height: '42px', fontSize: '14.5px', fontWeight: 600 }}
@@ -204,10 +219,11 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
               </div>
 
               <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 700 }}>
+                <label htmlFor="client-form-address" className="form-label" style={{ fontWeight: 700 }}>
                   {lang === 'ta' ? 'முகவரி / ஊர்' : 'Village / Address'}
                 </label>
                 <input
+                  id="client-form-address"
                   type="text"
                   className="form-input"
                   style={{ height: '42px', fontSize: '14.5px' }}
@@ -232,7 +248,7 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
 
               {/* Principal Amount Field */}
               <div className="form-group" style={{ marginBottom: '10px' }}>
-                <label className="form-label" style={{ fontWeight: 700 }}>
+                <label htmlFor="client-form-principal" className="form-label" style={{ fontWeight: 700 }}>
                   {lang === 'ta' ? 'தவணை அசல் தொகை (₹) *' : 'Principal Amount (₹) *'}
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -240,6 +256,7 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
                     ₹
                   </span>
                   <input
+                    id="client-form-principal"
                     type="number"
                     required
                     min="500"

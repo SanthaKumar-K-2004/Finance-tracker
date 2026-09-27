@@ -114,6 +114,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
                 className={`btn btn-sm ${viewMode === 'grid' ? 'btn-primary' : ''}`}
                 style={{ padding: '4px 10px', height: '30px', border: 'none' }}
                 title={t('grid_view')}
+                aria-label={t('grid_view') || 'Grid View'}
               >
                 <Table size={15} />
                 <span>{t('grid_view')}</span>
@@ -124,6 +125,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
                 className={`btn btn-sm ${viewMode === 'card' ? 'btn-primary' : ''}`}
                 style={{ padding: '4px 10px', height: '30px', border: 'none' }}
                 title={t('card_view')}
+                aria-label={t('card_view') || 'Card View'}
               >
                 <CreditCard size={15} />
                 <span>{t('card_view')}</span>
@@ -138,6 +140,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
             className="btn btn-secondary btn-sm"
             style={{ height: '36px' }}
             title={t('btn_cash_counter')}
+            aria-label={t('btn_cash_counter') || 'Cash Counter'}
           >
             <Calculator size={16} color="var(--emerald-primary)" />
             <span>{t('btn_cash_counter')}</span>
@@ -234,6 +237,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
             className="btn btn-secondary btn-sm"
             style={{ height: '36px', fontWeight: 700, padding: '4px 10px' }}
             title="Switch Language / மொழியை மாற்றுக"
+            aria-label="Switch Language / மொழியை மாற்றுக"
           >
             <Languages size={15} />
             <span>{lang === 'ta' ? 'தமிழ்' : 'English'}</span>
@@ -248,6 +252,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
             className="btn-icon"
             style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             title={t('btn_cash_counter')}
+            aria-label={t('btn_cash_counter') || 'Cash Counter'}
           >
             <Calculator size={16} color="var(--emerald-primary)" />
           </button>
@@ -258,6 +263,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
             className="btn-icon"
             style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             title={t('theme_' + themeMode)}
+            aria-label={t('theme_' + themeMode) || 'Cycle Theme'}
           >
             {themeMode === 'auto' ? (
               <Clock size={15} color="var(--amber-primary)" />
@@ -276,6 +282,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
             className="btn btn-secondary btn-sm"
             style={{ height: '30px', padding: '0 8px', fontSize: '11.5px', fontWeight: 800 }}
             title="Switch Language"
+            aria-label="Switch Language"
           >
             {lang === 'ta' ? 'தமிழ்' : 'EN'}
           </button>
@@ -298,6 +305,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
               className={`btn btn-sm ${viewMode === 'grid' ? 'btn-primary' : ''}`}
               style={{ padding: '3px 8px', height: '28px', border: 'none', fontSize: '11px' }}
               title={t('grid_view')}
+              aria-label={t('grid_view') || 'Grid View'}
             >
               <Table size={13} />
             </button>
@@ -307,6 +315,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
               className={`btn btn-sm ${viewMode === 'card' ? 'btn-primary' : ''}`}
               style={{ padding: '3px 8px', height: '28px', border: 'none', fontSize: '11px' }}
               title={t('card_view')}
+              aria-label={t('card_view') || 'Card View'}
             >
               <CreditCard size={13} />
             </button>
@@ -411,6 +420,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
           type="button"
           onClick={() => setShowCashCounter(true)}
           className="mobile-nav-item"
+          aria-label={lang === 'ta' ? 'பணக் கணக்கீடு' : 'Cash Denomination Counter'}
         >
           <Calculator size={20} />
           <span>{lang === 'ta' ? 'கணக்கீடு' : 'Cash'}</span>
@@ -420,6 +430,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
           type="button"
           onClick={() => setShowMobileMore(true)}
           className={`mobile-nav-item ${showMobileMore ? 'active' : ''}`}
+          aria-label={lang === 'ta' ? 'கூடுதல் பட்டி' : 'More Menu'}
         >
           <Menu size={20} />
           <span>{lang === 'ta' ? 'மேலும்' : 'More'}</span>
@@ -441,6 +452,7 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
                 onClick={() => setShowMobileMore(false)}
                 className="btn-icon"
                 style={{ width: '32px', height: '32px' }}
+                aria-label={lang === 'ta' ? 'மூடுக' : 'Close Menu'}
               >
                 <X size={17} />
               </button>

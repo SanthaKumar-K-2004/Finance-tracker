@@ -421,6 +421,7 @@ export default function SettingsPage() {
               ref={fileInputRef}
               type="file"
               accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+              aria-label={lang === 'ta' ? 'நிறுவன லோகோவை பதிவேற்றவும்' : 'Upload Shop Logo'}
               style={{ display: 'none' }}
               onChange={(e) => {
                 if (e.target.files && e.target.files[0]) {
@@ -556,8 +557,9 @@ export default function SettingsPage() {
         <form onSubmit={handleSaveProfile}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <label className="form-label">{lang === 'ta' ? 'நிறுவனப் பெயர் (Shop Name)' : 'Shop Name'} *</label>
+              <label htmlFor="settings-profile-name" className="form-label">{lang === 'ta' ? 'நிறுவனப் பெயர் (Shop Name)' : 'Shop Name'} *</label>
               <input
+                id="settings-profile-name"
                 type="text"
                 className="form-input"
                 required
@@ -569,8 +571,9 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <label className="form-label">{lang === 'ta' ? 'தொடர்பு எண் (Phone)' : 'Phone Number'} *</label>
+              <label htmlFor="settings-profile-phone" className="form-label">{lang === 'ta' ? 'தொடர்பு எண் (Phone)' : 'Phone Number'} *</label>
               <input
+                id="settings-profile-phone"
                 type="tel"
                 className="form-input font-mono"
                 required
@@ -582,8 +585,9 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <label className="form-label">{lang === 'ta' ? 'துணைப் பெயர் / கிளை (Tagline / Branch)' : 'Tagline / Branch'}</label>
+              <label htmlFor="settings-profile-tagline" className="form-label">{lang === 'ta' ? 'துணைப் பெயர் / கிளை (Tagline / Branch)' : 'Tagline / Branch'}</label>
               <input
+                id="settings-profile-tagline"
                 type="text"
                 className="form-input"
                 readOnly={!isEditingProfile}
@@ -594,8 +598,9 @@ export default function SettingsPage() {
               />
             </div>
             <div>
-              <label className="form-label">{lang === 'ta' ? 'முகவரி (Address)' : 'Shop Address'} *</label>
+              <label htmlFor="settings-profile-address" className="form-label">{lang === 'ta' ? 'முகவரி (Address)' : 'Shop Address'} *</label>
               <input
+                id="settings-profile-address"
                 type="text"
                 className="form-input"
                 required
@@ -726,6 +731,7 @@ export default function SettingsPage() {
             <input
               type="file"
               accept=".json,.db,.sqlite"
+              aria-label={lang === 'ta' ? 'தரவுத்தள காப்புப் பிரதி கோப்பை தேர்ந்தெடுக்கவும்' : 'Restore database from backup file'}
               style={{ display: 'none' }}
               disabled={restoring}
               onChange={handleRestoreFile}

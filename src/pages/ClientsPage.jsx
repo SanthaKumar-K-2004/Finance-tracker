@@ -101,6 +101,7 @@ export default function ClientsPage({ activeMonth }) {
             <Search size={15} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '12px' }} />
             <input
               type="text"
+              aria-label={t('search_placeholder') || 'Search borrowers'}
               className="form-input"
               style={{ paddingLeft: '34px', height: '38px', width: '100%' }}
               placeholder={t('search_placeholder')}
@@ -221,6 +222,7 @@ export default function ClientsPage({ activeMonth }) {
                           className="btn-icon"
                           style={{ padding: '4px', color: 'var(--indigo-primary)' }}
                           title={lang === 'ta' ? 'அசல் தவணை சீட்டு (Thavanai Slip)' : 'New Thavanai Slip'}
+                          aria-label={lang === 'ta' ? 'அசல் தவணை சீட்டு' : 'New Thavanai Slip'}
                         >
                           <FileText size={14} />
                         </button>
@@ -236,6 +238,7 @@ export default function ClientsPage({ activeMonth }) {
                             className="btn-icon"
                             style={{ padding: '4px', color: '#25D366' }}
                             title="WhatsApp"
+                            aria-label={t('btn_whatsapp') || 'WhatsApp'}
                           >
                             <MessageSquare size={14} />
                           </button>
@@ -251,6 +254,7 @@ export default function ClientsPage({ activeMonth }) {
                           className="btn-icon"
                           style={{ padding: '4px' }}
                           title="Edit"
+                          aria-label={lang === 'ta' ? 'வாடிக்கையாளர் திருத்தம்' : 'Edit Borrower'}
                         >
                           <Edit size={14} />
                         </button>
@@ -263,6 +267,7 @@ export default function ClientsPage({ activeMonth }) {
                             className="btn-icon"
                             style={{ padding: '4px', color: 'var(--amber-primary)' }}
                             title={lang === 'ta' ? 'வசூல் மீட்டமை' : 'Reset Collections'}
+                            aria-label={lang === 'ta' ? 'வசூல் மீட்டமை' : 'Reset Collections'}
                           >
                             <RotateCcw size={14} />
                           </button>
@@ -275,6 +280,7 @@ export default function ClientsPage({ activeMonth }) {
                           className="btn-icon"
                           style={{ padding: '4px', color: 'var(--rose-primary)' }}
                           title="Delete"
+                          aria-label={lang === 'ta' ? 'நீக்குக' : 'Delete Borrower'}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -410,6 +416,7 @@ export default function ClientsPage({ activeMonth }) {
                       className="btn btn-secondary btn-sm"
                       style={{ height: '32px', padding: '0 6px', color: 'var(--amber-primary)' }}
                       title={lang === 'ta' ? 'வசூல் மீட்டமை' : 'Reset Collections'}
+                      aria-label={lang === 'ta' ? 'வசூல் மீட்டமை' : 'Reset Collections'}
                     >
                       <RotateCcw size={12} />
                     </button>
@@ -422,6 +429,7 @@ export default function ClientsPage({ activeMonth }) {
                     className="btn btn-secondary btn-sm"
                     style={{ height: '32px', padding: '0 6px', color: 'var(--rose-primary)' }}
                     title="Delete"
+                    aria-label={lang === 'ta' ? 'நீக்குக' : 'Delete Borrower'}
                   >
                     <Trash2 size={12} />
                   </button>

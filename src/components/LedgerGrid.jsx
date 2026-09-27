@@ -280,6 +280,7 @@ export default function LedgerGrid({
                             className={`cell-input ${hasValue ? 'cell-has-value' : ''} ${isCellLocked ? 'cell-locked' : ''} ${isCleared && isRowUnlocked ? 'cell-unlocked-editing' : ''}`}
                             value={amount === 0 ? '' : amount}
                             placeholder="-"
+                            aria-label={`Day ${day}, ${row.borrower_name || row.name || 'Borrower'}`}
                             title={isCellLocked ? (lang === 'ta' ? 'தவணை நிறைவடைந்தது (பூட்டப்பட்டுள்ளது). திருத்த வலதுபுறம் பூட்டை திறக்க.' : 'Thavanai cleared (locked). Click Unlock icon to edit.') : undefined}
                             onFocus={(e) => !isCellLocked && e.target.select()}
                             onKeyDown={(e) => !isCellLocked && handleKeyDown(e, rIdx, day)}
@@ -330,6 +331,7 @@ export default function LedgerGrid({
                               background: unlockedRows[row.cycle_id] ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.1)'
                             }}
                             title={unlockedRows[row.cycle_id] ? (lang === 'ta' ? 'பூட்டுக (பாதுகாக்க)' : 'Lock entries') : (lang === 'ta' ? 'திருத்த பூட்டை திறக்க' : 'Unlock to edit payments')}
+                            aria-label={unlockedRows[row.cycle_id] ? (lang === 'ta' ? 'பூட்டுக' : 'Lock entries') : (lang === 'ta' ? 'பூட்டை திறக்க' : 'Unlock entries')}
                           >
                             {unlockedRows[row.cycle_id] ? <Unlock size={14} /> : <Lock size={14} />}
                           </button>
@@ -348,6 +350,7 @@ export default function LedgerGrid({
                           className="btn-icon"
                           style={{ padding: '4px', color: '#25D366' }}
                           title={t('btn_whatsapp')}
+                          aria-label={t('btn_whatsapp') || 'WhatsApp'}
                         >
                           <MessageSquare size={15} />
                         </button>
@@ -365,6 +368,7 @@ export default function LedgerGrid({
                           className="btn-icon"
                           style={{ padding: '4px' }}
                           title={t('btn_print')}
+                          aria-label={t('btn_print') || 'Print receipt'}
                         >
                           <Printer size={15} />
                         </button>
@@ -376,6 +380,7 @@ export default function LedgerGrid({
                           className="btn-icon"
                           style={{ padding: '4px' }}
                           title={lang === 'ta' ? 'வாடிக்கையாளர் திருத்தம்' : 'Edit Borrower'}
+                          aria-label={lang === 'ta' ? 'வாடிக்கையாளர் திருத்தம்' : 'Edit Borrower'}
                         >
                           <Edit size={14} />
                         </button>
@@ -387,6 +392,7 @@ export default function LedgerGrid({
                           className="btn-icon"
                           style={{ padding: '4px', color: 'var(--amber-primary)' }}
                           title={lang === 'ta' ? 'வசூல் மீட்டமை (0 ஆக்குக)' : 'Reset Collections to ₹0'}
+                          aria-label={lang === 'ta' ? 'வசூல் மீட்டமை' : 'Reset Collections to ₹0'}
                         >
                           <RotateCcw size={14} />
                         </button>
@@ -398,6 +404,7 @@ export default function LedgerGrid({
                           className="btn-icon"
                           style={{ padding: '4px', color: 'var(--rose-primary)' }}
                           title={lang === 'ta' ? 'நீக்குக' : 'Delete Borrower'}
+                          aria-label={lang === 'ta' ? 'நீக்குக' : 'Delete Borrower'}
                         >
                           <Trash2 size={14} />
                         </button>
@@ -422,6 +429,7 @@ export default function LedgerGrid({
                               boxShadow: '0 2px 4px rgba(5, 150, 105, 0.25)'
                             }}
                             title={t('btn_close_loan')}
+                            aria-label={t('btn_close_loan') || 'Close Loan'}
                           >
                             <CheckCircle2 size={13} />
                             <span>{lang === 'ta' ? 'முடிக்க' : 'Close'}</span>
