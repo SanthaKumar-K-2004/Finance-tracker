@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { query, execute } from '../db.js';
 import { serverCache } from '../utils/cache.js';
+import { parseCurrencyNumber } from '../utils/currency.js';
 
 const router = Router();
 
@@ -265,8 +266,8 @@ router.post('/settlements', async (req, res) => {
         companyId,
         today,
         agent_name,
-        parseFloat(expected_amount) || 0,
-        parseFloat(actual_amount) || 0,
+        parseCurrencyNumber(expected_amount, 0),
+        parseCurrencyNumber(actual_amount, 0),
         JSON.stringify(denomination || {})
       ]
     );
