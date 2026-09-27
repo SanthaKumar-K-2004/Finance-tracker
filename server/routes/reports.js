@@ -2,13 +2,14 @@ import { Router } from 'express';
 import { query, execute } from '../db.js';
 import { serverCache } from '../utils/cache.js';
 import { parseCurrencyNumber } from '../utils/currency.js';
+import { sanitizeMonthYear } from '../utils/date.js';
 
 const router = Router();
 
 // GET dashboard KPIs & analytics
 router.get('/dashboard', async (req, res) => {
   try {
-    const month_year = req.query.month_year || '2026-05';
+    const month_year = sanitizeMonthYear(req.query.month_year);
     const cacheKey = `dashboard_${month_year}`;
 
     const payload = await serverCache.getOrFetch(cacheKey, async () => {

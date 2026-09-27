@@ -30,11 +30,11 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
   const monthDays = (yNum && mNum) ? new Date(yNum, mNum, 0).getDate() : 31;
 
   const handleDownloadData = () => {
-    window.location.href = `/api/excel/export?month_year=${activeMonth}`;
+    window.location.href = `/api/excel/export?month_year=${activeMonthFallback}`;
   };
 
   const handleDownloadTemplate = () => {
-    window.location.href = `/api/excel/template?month_year=${activeMonth}`;
+    window.location.href = `/api/excel/template?month_year=${activeMonthFallback}`;
   };
 
   // Process file for interactive preview

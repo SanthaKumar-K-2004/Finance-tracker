@@ -7,6 +7,7 @@ import { query, execute, batch } from '../db.js';
 import crypto from 'crypto';
 import { serverCache } from '../utils/cache.js';
 import { parseCurrencyNumber } from '../utils/currency.js';
+import { sanitizeMonthYear } from '../utils/date.js';
 
 const router = Router();
 const XLSX = xlsx.default || xlsx;
@@ -39,7 +40,7 @@ const upload = multer({ storage });
 // GET download blank pre-formatted Excel template with formulas for the actual month's days
 router.get('/template', (req, res) => {
   try {
-    const month_year = req.query.month_year || '2026-05';
+    const month_year = sanitizeMonthYear(req.query.month_year);
     const [year, month] = month_year.split('-');
     const yNum = parseInt(year, 10);
     const mNum = parseInt(month, 10);
@@ -163,7 +164,7 @@ router.get('/template', (req, res) => {
 // GET export ALR-formatted Excel sheet for the actual month's days
 router.get('/export', async (req, res) => {
   try {
-    const month_year = req.query.month_year || '2026-05';
+    const month_year = sanitizeMonthYear(req.query.month_year);
     const companyId = 'comp_alr_001';
 
     const [year, month] = month_year.split('-');

@@ -122,13 +122,20 @@ export default function BulkEntryModal({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '520px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+      <div 
+        className="modal-content" 
+        style={{ maxWidth: '520px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} 
+        onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bulk-entry-title"
+      >
         {/* Header */}
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Layers size={19} color="var(--emerald-primary)" />
             <div>
-              <h2 className="modal-title">
+              <h2 id="bulk-entry-title" className="modal-title">
                 {lang === 'ta' ? 'தொகுப்பு வசூல் பதிவு (Bulk Entry Mode)' : 'Bulk Collection Entry Mode'}
               </h2>
               <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
@@ -136,7 +143,12 @@ export default function BulkEntryModal({
               </p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="btn-icon">
+          <button 
+            type="button" 
+            onClick={onClose} 
+            className="btn-icon"
+            aria-label={lang === 'ta' ? 'தொகுப்பு வசூல் சாளரத்தை மூடுக' : 'Close bulk entry dialog'}
+          >
             <X size={18} />
           </button>
         </div>

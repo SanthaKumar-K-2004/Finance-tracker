@@ -1074,13 +1074,13 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
       {/* Reset Collections Safety Modal */}
       {clientToReset && (
         <div className="modal-overlay" onClick={() => !resetting && setClientToReset(null)} style={{ zIndex: 9999 }}>
-          <div className="modal-content" style={{ maxWidth: '420px', padding: '22px' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby="reset-modal-title" style={{ maxWidth: '420px', padding: '22px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'var(--amber-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--amber-primary)', flexShrink: 0 }}>
                 <RotateCcw size={22} />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                <h3 id="reset-modal-title" style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>
                   {lang === 'ta' ? 'வசூல் தொகையை மீட்டமைக்கவா?' : 'Reset Borrower Collections?'}
                 </h3>
                 <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
@@ -1137,13 +1137,13 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
       {/* Delete Borrower Dual Choice Safety Modal */}
       {clientToDelete && (
         <div className="modal-overlay" onClick={() => !deleting && setClientToDelete(null)} style={{ zIndex: 9999 }}>
-          <div className="modal-content" style={{ maxWidth: '440px', padding: '22px' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby="delete-borrower-title" style={{ maxWidth: '440px', padding: '22px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
               <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'var(--rose-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--rose-primary)', flexShrink: 0 }}>
                 <Trash2 size={22} />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                <h3 id="delete-borrower-title" style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)' }}>
                   {lang === 'ta' ? 'வாடிக்கையாளரை நீக்குதல்' : 'Delete Borrower Options'}
                 </h3>
                 <span style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>

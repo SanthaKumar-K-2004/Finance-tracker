@@ -3,13 +3,14 @@ import { query, execute, batch } from '../db.js';
 import crypto from 'crypto';
 import { serverCache } from '../utils/cache.js';
 import { parseCurrencyNumber } from '../utils/currency.js';
+import { sanitizeMonthYear, getDaysInMonth } from '../utils/date.js';
 
 const router = Router();
 
 // GET 31-Day Ledger Grid
 router.get(['/', '/grid'], async (req, res) => {
   try {
-    const month_year = req.query.month_year || '2026-05';
+    const month_year = sanitizeMonthYear(req.query.month_year);
     const cacheKey = `grid_${month_year}`;
 
     const payload = await serverCache.getOrFetch(cacheKey, async () => {
@@ -139,7 +140,7 @@ router.get(['/', '/grid'], async (req, res) => {
     res.json(payload);
   } catch (err) {
     console.error('[GRID] Error serving grid data:', err.message);
-    const month_year = req.query.month_year || '2026-05';
+    const month_year = sanitizeMonthYear(req.query.month_year);
     const stale = serverCache.getStale(`grid_${month_year}`);
     if (stale) {
       console.warn(`[GRID] Serving stale snapshot for ${month_year} to preserve 100% uptime`);

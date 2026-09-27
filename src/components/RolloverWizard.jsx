@@ -62,15 +62,15 @@ export default function RolloverWizard({ fromMonth, onRolloverComplete, onClose 
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '600px' }} onClick={e => e.stopPropagation()}>
+      <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby="rollover-wizard-title" style={{ maxWidth: '600px' }} onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <RefreshCw size={18} color="var(--indigo-primary)" />
-            <h2 className="modal-title">
+            <h2 className="modal-title" id="rollover-wizard-title">
               {lang === 'ta' ? 'மாதாந்திர மாற்றம் (Month-End Rollover Wizard)' : 'Month-End Rollover Wizard'}
             </h2>
           </div>
-          <button type="button" onClick={onClose} className="btn-icon">
+          <button type="button" onClick={onClose} className="btn-icon" aria-label={lang === 'ta' ? 'மூடு' : 'Close'}>
             <X size={18} />
           </button>
         </div>

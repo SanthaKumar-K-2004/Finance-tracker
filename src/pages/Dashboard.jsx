@@ -55,7 +55,8 @@ export default function Dashboard({ activeMonth }) {
   const loadDashboard = useCallback(async (isManualRefresh = false) => {
     try {
       if (isManualRefresh) setRefreshing(true);
-      const res = await fetch(`/api/reports/dashboard?month_year=${activeMonth}`);
+      const safeMonth = activeMonth || new Date().toISOString().slice(0, 7);
+      const res = await fetch(`/api/reports/dashboard?month_year=${safeMonth}`);
       const json = await res.json();
       if (json.success) {
         setData(json.data);
@@ -74,6 +75,10 @@ export default function Dashboard({ activeMonth }) {
     loadDashboard();
     if (!autoRefresh) return;
     const timer = setInterval(() => {
+      // Memory/Battery optimization: only refresh when page is actively visible
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
       loadDashboard(false);
     }, 30000);
     return () => clearInterval(timer);

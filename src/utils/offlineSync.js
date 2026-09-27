@@ -6,10 +6,29 @@
 const QUEUE_KEY = 'alr_offline_payment_queue';
 const CACHE_PREFIX = 'alr_cache_grid_';
 
-// 1. Grid Cache Management
+// 1. Grid Cache Management (with LRU eviction to prevent memory/storage leaks)
 export function saveGridCache(monthYear, data) {
   try {
     if (!monthYear || !data) return;
+
+    // Prune old grid caches to preserve memory and keep storage strictly bounded (max 6 months)
+    const allKeys = Object.keys(localStorage).filter(k => k.startsWith(CACHE_PREFIX));
+    if (allKeys.length >= 6) {
+      const entries = allKeys.map(k => {
+        try {
+          const item = JSON.parse(localStorage.getItem(k));
+          return { key: k, ts: item?.timestamp || 0 };
+        } catch (_) {
+          return { key: k, ts: 0 };
+        }
+      }).sort((a, b) => a.ts - b.ts);
+
+      while (entries.length >= 6) {
+        const oldest = entries.shift();
+        if (oldest) localStorage.removeItem(oldest.key);
+      }
+    }
+
     localStorage.setItem(`${CACHE_PREFIX}${monthYear}`, JSON.stringify({
       timestamp: Date.now(),
       data

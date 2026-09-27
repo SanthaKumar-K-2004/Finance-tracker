@@ -317,13 +317,13 @@ export default function ClientCard({
       {/* Safety Guard: Confirmation Modal for Settling Full Due */}
       {showFullConfirm && (
         <div className="modal-overlay" onClick={() => setShowFullConfirm(false)} style={{ zIndex: 9999 }}>
-          <div className="modal-content" style={{ maxWidth: '380px', padding: '20px' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby="full-settle-title" style={{ maxWidth: '380px', padding: '20px' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
               <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'var(--emerald-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--emerald-primary)', flexShrink: 0 }}>
                 <CheckCircle2 size={22} />
               </div>
               <div>
-                <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                <h4 id="full-settle-title" style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)' }}>
                   {lang === 'ta' ? 'முழு நிலுவை வசூல் உறுதிப்படுத்தல்' : 'Confirm Full Due Settlement'}
                 </h4>
                 <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
