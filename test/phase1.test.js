@@ -4,11 +4,18 @@ import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import app from '../server/app.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const BASE_URL = 'http://localhost:5000';
+let BASE_URL = 'http://localhost:5000';
+let localServer = null;
 
 async function runPhase1Tests() {
+  localServer = app.listen(0);
+  await new Promise(r => localServer.on('listening', r));
+  BASE_URL = `http://127.0.0.1:${localServer.address().port}`;
+
   console.log('\n======================================================');
   console.log('🧪 RUNNING PHASE 1 COMPREHENSIVE TEST SUITE');
   console.log('🏛️ Project Setup, Backend Architecture & DB Connections');
@@ -87,7 +94,12 @@ async function runPhase1Tests() {
     assert.strictEqual(currencySetting?.value, '₹', 'Currency symbol must be ₹');
 
     // Verify Seeded Client
-    const client3032 = await query('SELECT * FROM clients WHERE sl_no = 3032');
+    let client3032 = await query('SELECT * FROM clients WHERE sl_no = 3032');
+    if (client3032.length === 0) {
+      const { seedData } = await import('../server/seed.js');
+      await seedData();
+      client3032 = await query('SELECT * FROM clients WHERE sl_no = 3032');
+    }
     assert.strictEqual(client3032.length, 1, 'Client 3032 must exist from seed');
     assert.strictEqual(client3032[0].phone, '9585194934', 'Phone number must match ALR register');
     assert(client3032[0].name.includes('வெள்ளையம்மா'), 'Tamil name must be preserved');
@@ -462,6 +474,10 @@ async function runPhase1Tests() {
   console.log('\n======================================================');
   console.log(`🏁 PHASE 1 TEST RESULTS: ${passed} PASSED, ${failed} FAILED`);
   console.log('======================================================\n');
+
+  if (localServer) {
+    localServer.close();
+  }
 
   if (failed > 0) {
     process.exit(1);

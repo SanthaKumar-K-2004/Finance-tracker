@@ -1,14 +1,21 @@
 import { Router } from 'express';
-import { query, execute, batch } from '../db.js';
+import { query, execute, batch, batchQueued } from '../db.js';
 import { serverCache } from '../utils/cache.js';
+import { sanitizeMonthYear } from '../utils/date.js';
 
 const router = Router();
 
 // GET preview of month-end rollover (Ultra-fast cached aggregation)
 router.get('/preview', async (req, res) => {
   try {
-    const from_month = req.query.from_month || '2026-05';
-    const to_month = req.query.to_month || '2026-06';
+    const from_month = sanitizeMonthYear(req.query.from_month);
+    let to_month = req.query.to_month;
+    if (!to_month || !/^\d{4}-\d{2}$/.test(to_month)) {
+      const [y, m] = from_month.split('-').map(Number);
+      const nextM = m === 12 ? 1 : m + 1;
+      const nextY = m === 12 ? y + 1 : y;
+      to_month = `${nextY}-${String(nextM).padStart(2, '0')}`;
+    }
     const companyId = 'comp_alr_001';
 
     const cacheKey = `rollover_preview_${companyId}_${from_month}_${to_month}`;
@@ -232,7 +239,7 @@ router.post('/execute', async (req, res) => {
     for (let i = 0; i < statements.length; i += 50) {
       const chunk = statements.slice(i, i + 50);
       if (chunk.length > 0) {
-        await batch(chunk);
+        await batchQueued(chunk);
       }
     }
 

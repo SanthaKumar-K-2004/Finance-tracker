@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import { writeQueue } from './utils/writeQueue.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -207,6 +208,18 @@ export async function batch(statements) {
   throw lastErr;
 }
 
+/**
+ * Concurrency-Protected Write Execution
+ * Queues write operations during high multi-user traffic spikes to eliminate SQLITE_BUSY lock contention
+ */
+export async function executeQueued(sql, args = [], priority = 0) {
+  return writeQueue.enqueue(() => execute(sql, args), priority);
+}
+
+export async function batchQueued(statements, priority = 0) {
+  return writeQueue.enqueue(() => batch(statements), priority);
+}
+
 // Database Schema DDL
 export const SCHEMA_SQL = `
 -- 1. Companies (Multi-Tenant Root)
@@ -321,12 +334,20 @@ CREATE TABLE IF NOT EXISTS whatsapp_logs (
     sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Performance & Query Optimization Indexes
+-- Performance & Query Optimization Indexes (High-Concurrency & Search-Engine Optimized)
 CREATE INDEX IF NOT EXISTS idx_clients_company_sl ON clients(company_id, sl_no);
+CREATE INDEX IF NOT EXISTS idx_clients_phone ON clients(phone);
+CREATE INDEX IF NOT EXISTS idx_clients_name ON clients(name);
+CREATE INDEX IF NOT EXISTS idx_clients_code ON clients(client_code);
+CREATE INDEX IF NOT EXISTS idx_clients_comp_status ON clients(company_id, status);
 CREATE INDEX IF NOT EXISTS idx_loan_cycles_month ON loan_cycles(company_id, month_year);
 CREATE INDEX IF NOT EXISTS idx_loan_cycles_client ON loan_cycles(client_id);
+CREATE INDEX IF NOT EXISTS idx_loan_cycles_client_status ON loan_cycles(client_id, status);
+CREATE INDEX IF NOT EXISTS idx_loan_cycles_comp_status ON loan_cycles(company_id, status);
 CREATE INDEX IF NOT EXISTS idx_daily_collections_date ON daily_collections(collection_date);
 CREATE INDEX IF NOT EXISTS idx_daily_collections_cycle ON daily_collections(cycle_id);
+CREATE INDEX IF NOT EXISTS idx_daily_collections_cycle_day ON daily_collections(cycle_id, day_number);
+CREATE INDEX IF NOT EXISTS idx_daily_collections_comp_date ON daily_collections(company_id, collection_date);
 CREATE INDEX IF NOT EXISTS idx_closed_clients_comp ON closed_clients(company_id);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_logs_client ON whatsapp_logs(client_id);
 CREATE INDEX IF NOT EXISTS idx_whatsapp_logs_phone ON whatsapp_logs(phone);
@@ -337,8 +358,10 @@ export async function initSchema() {
   if (!isTurso) {
     try {
       await db.execute('PRAGMA journal_mode = WAL;');
-      await db.execute('PRAGMA busy_timeout = 5000;');
+      await db.execute('PRAGMA busy_timeout = 10000;');
       await db.execute('PRAGMA synchronous = NORMAL;');
+      await db.execute('PRAGMA cache_size = -64000;');
+      await db.execute('PRAGMA temp_store = MEMORY;');
     } catch (e) {
       // Ignored for cloud/unsupported drivers
     }

@@ -345,7 +345,7 @@ router.post('/preview', upload.single('file'), async (req, res) => {
     }
 
     // Determine target month and days from request or sheet
-    const month_year = req.body?.month_year || '2026-05';
+    const month_year = sanitizeMonthYear(req.body?.month_year);
     const [yStr, mStr] = month_year.split('-');
     const yNum = parseInt(yStr, 10);
     const mNum = parseInt(mStr, 10);
@@ -490,13 +490,15 @@ router.post('/import', upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'No Excel file uploaded' });
     }
 
-    const month_year = req.body.month_year || '2026-05';
-    const cycle_name = req.body.cycle_name || `${month_year} Cycle`;
-    const companyId = 'comp_alr_001';
-
+    const month_year = sanitizeMonthYear(req.body?.month_year);
     const [yStr, mStr] = month_year.split('-');
     const yNum = parseInt(yStr, 10);
     const mNum = parseInt(mStr, 10);
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const autoCycleName = (yNum && mNum && mNum >= 1 && mNum <= 12) ? `${monthNames[mNum - 1]} ${yNum}` : `${month_year} Cycle`;
+    const cycle_name = req.body?.cycle_name || autoCycleName;
+    const companyId = 'comp_alr_001';
+
     const totalDays = (yNum && mNum) ? new Date(yNum, mNum, 0).getDate() : 31;
     const endDate = `${month_year}-${String(totalDays).padStart(2, '0')}`;
 
@@ -523,11 +525,11 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
       if (!name) continue;
 
-      // Upsert client
+      // Upsert client (match by phone, sl_no, or exact name)
       let clientId;
       const existingClient = await query(
-        'SELECT id FROM clients WHERE company_id = ? AND (sl_no = ? OR (phone != \'\' AND phone = ?))',
-        [companyId, slNo, phone]
+        "SELECT id FROM clients WHERE company_id = ? AND (sl_no = ? OR (phone != '' AND phone = ?) OR LOWER(TRIM(name)) = LOWER(TRIM(?)))",
+        [companyId, slNo, phone, name]
       );
 
       if (existingClient.length > 0) {

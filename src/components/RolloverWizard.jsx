@@ -32,6 +32,15 @@ export default function RolloverWizard({ fromMonth, onRolloverComplete, onClose 
       .finally(() => setLoading(false));
   }, [fromMonth, toMonth]);
 
+  // Close on Escape key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && !executing) onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [executing, onClose]);
+
   const handleExecute = async () => {
     setExecuting(true);
     setError('');
@@ -159,7 +168,13 @@ export default function RolloverWizard({ fromMonth, onRolloverComplete, onClose 
         </div>
 
         <div className="modal-footer">
-          <button type="button" onClick={onClose} disabled={executing} className="btn btn-secondary btn-sm">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={executing}
+            className="btn btn-secondary btn-sm"
+            aria-label={t('btn_cancel') || 'Cancel'}
+          >
             {t('btn_cancel')}
           </button>
           <button

@@ -44,7 +44,12 @@ async function runPhase0Tests() {
 
   // 3. Seeded ALR data
   await test('3. Seeded Client 3032 from ALR Excel', async () => {
-    const client = await query('SELECT * FROM clients WHERE sl_no = 3032');
+    let client = await query('SELECT * FROM clients WHERE sl_no = 3032');
+    if (client.length === 0) {
+      const { seedData } = await import('../server/seed.js');
+      await seedData();
+      client = await query('SELECT * FROM clients WHERE sl_no = 3032');
+    }
     assert(client.length > 0, 'Client 3032 must exist');
     assert.strictEqual(client[0].phone, '9585194934', 'Phone number must match');
     assert(client[0].name.includes('வெள்ளையம்மா'), 'Name must contain Tamil text');

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { X, UserPlus, Save, AlertCircle, AlertTriangle, Trash2, Banknote } from 'lucide-react';
+import { getCurrentMonthYear } from '../utils/date';
+import { X, UserPlus, Save, AlertCircle, AlertTriangle, Trash2, Banknote, CheckCircle } from 'lucide-react';
 
 export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onClose, onDeleteClient }) {
   const { lang, t } = useLanguage();
@@ -29,22 +30,57 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
       .catch(console.error);
   }, []);
 
+  // Close on Escape key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
+
   const cleanPhoneInput = phone.replace(/[^0-9]/g, '');
-  const duplicateMatch = useMemo(() => {
-    if (!cleanPhoneInput && !name.trim()) return null;
+  const activeTargetMonth = monthYear || getCurrentMonthYear();
+
+  // Check phone collision with a DIFFERENT borrower
+  const phoneCollision = useMemo(() => {
+    if (!cleanPhoneInput || cleanPhoneInput.length < 10) return null;
     const currentId = clientToEdit?.client_id || clientToEdit?.id;
     return existingClients.find(c => {
       if (c.id === currentId) return false;
       const cPhone = String(c.phone || '').replace(/[^0-9]/g, '');
-      if (cleanPhoneInput.length >= 10 && cPhone.length >= 10 && cPhone.endsWith(cleanPhoneInput.slice(-10))) {
-        return true;
-      }
-      if (name.trim() && c.name.trim().toLowerCase() === name.trim().toLowerCase()) {
-        return true;
-      }
-      return false;
+      const isPhoneMatch = cPhone.length >= 10 && cPhone.endsWith(cleanPhoneInput.slice(-10));
+      const isDiffName = name.trim() && c.name.trim().toLowerCase() !== name.trim().toLowerCase();
+      return isPhoneMatch && isDiffName;
     });
   }, [existingClients, cleanPhoneInput, name, clientToEdit]);
+
+  // Check duplicate borrower already having loan in current active month
+  const duplicateActiveMonthMatch = useMemo(() => {
+    if (clientToEdit) return null;
+    if (!cleanPhoneInput && !name.trim()) return null;
+    return existingClients.find(c => {
+      const cPhone = String(c.phone || '').replace(/[^0-9]/g, '');
+      const isPhoneMatch = cleanPhoneInput.length >= 10 && cPhone.length >= 10 && cPhone.endsWith(cleanPhoneInput.slice(-10));
+      const isNameMatch = name.trim() && c.name.trim().toLowerCase() === name.trim().toLowerCase();
+      const hasCycleInMonth = c.month_year === activeTargetMonth;
+      return (isPhoneMatch || isNameMatch) && hasCycleInMonth;
+    });
+  }, [existingClients, cleanPhoneInput, name, clientToEdit, activeTargetMonth]);
+
+  // Existing client from previous month (re-activation / new loan)
+  const existingClientReusable = useMemo(() => {
+    if (clientToEdit || duplicateActiveMonthMatch) return null;
+    if (!cleanPhoneInput && !name.trim()) return null;
+    return existingClients.find(c => {
+      const cPhone = String(c.phone || '').replace(/[^0-9]/g, '');
+      const isPhoneMatch = cleanPhoneInput.length >= 10 && cPhone.length >= 10 && cPhone.endsWith(cleanPhoneInput.slice(-10));
+      const isNameMatch = name.trim() && c.name.trim().toLowerCase() === name.trim().toLowerCase();
+      return isPhoneMatch || isNameMatch;
+    });
+  }, [existingClients, cleanPhoneInput, name, clientToEdit, duplicateActiveMonthMatch]);
+
+  const isBlockedFromSaving = Boolean(phoneCollision || duplicateActiveMonthMatch);
 
   const handlePrincipalChange = (val) => {
     setPrincipal(val);
@@ -70,7 +106,7 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
           phone: phone.trim(),
           address: address.trim(),
           principal: typeof principal === 'string' ? (parseFloat(principal.replace(/[^0-9.-]/g, '')) || 10000) : (Number(principal) || 10000),
-          month_year: monthYear || '2026-05'
+          month_year: monthYear || getCurrentMonthYear()
         })
       });
 
@@ -156,13 +192,35 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
               </div>
             )}
 
-            {duplicateMatch && (
-              <div style={{ background: 'var(--amber-light)', color: 'var(--amber-text)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--amber-primary)' }}>
-                <AlertTriangle size={16} />
+            {duplicateActiveMonthMatch && (
+              <div style={{ background: 'var(--rose-light)', color: 'var(--rose-text)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--rose-border)' }}>
+                <AlertCircle size={16} color="var(--rose-primary)" />
                 <span>
                   {lang === 'ta'
-                    ? `எச்சரிக்கை: ${duplicateMatch.name} (${duplicateMatch.sl_no}) ஏற்கனவே இதே தொலைபேசி/பெயருடன் உள்ளார்!`
-                    : `Warning: Borrower already registered: ${duplicateMatch.name} (${duplicateMatch.sl_no})!`}
+                    ? `வாடிக்கையாளர் "${duplicateActiveMonthMatch.name}" (${duplicateActiveMonthMatch.sl_no}) ஏற்கனவே இந்த மாதத்தில் (${activeTargetMonth}) உள்ளார்! நகல் பதிவு அனுமதிக்கப்படாது.`
+                    : `Borrower "${duplicateActiveMonthMatch.name}" (${duplicateActiveMonthMatch.sl_no}) already has a loan in ${activeTargetMonth}! Duplicate client is blocked.`}
+                </span>
+              </div>
+            )}
+
+            {phoneCollision && (
+              <div style={{ background: 'var(--rose-light)', color: 'var(--rose-text)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--rose-border)' }}>
+                <AlertCircle size={16} color="var(--rose-primary)" />
+                <span>
+                  {lang === 'ta'
+                    ? `இந்தத் தொலைபேசி எண் (${phone}) ஏற்கனவே "${phoneCollision.name}" (${phoneCollision.sl_no}) என்பவருக்குப் பதிவு செய்யப்பட்டுள்ளது! நகல் அனுமதிக்கப்படாது.`
+                    : `Phone number ${phone} is already registered to "${phoneCollision.name}" (${phoneCollision.sl_no})! Duplicate phone is blocked.`}
+                </span>
+              </div>
+            )}
+
+            {existingClientReusable && (
+              <div style={{ background: 'var(--emerald-light)', color: 'var(--emerald-text)', padding: '10px 14px', borderRadius: 'var(--radius-md)', fontSize: '12.5px', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--emerald-border)' }}>
+                <CheckCircle size={16} color="var(--emerald-primary)" />
+                <span>
+                  {lang === 'ta'
+                    ? `முந்தைய வாடிக்கையாளர் "${existingClientReusable.name}" (${existingClientReusable.sl_no}) கண்டறியப்பட்டார். புதிய தவணை இவரது கணக்கில் சேர்க்கப்படும் (நகல் உருவாக்கப்படாது).`
+                    : `Existing borrower "${existingClientReusable.name}" (${existingClientReusable.sl_no}) found. A new cycle will be linked without duplicating borrower.`}
                 </span>
               </div>
             )}
@@ -194,7 +252,7 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
                   required
                   className="form-input"
                   style={{ height: '42px', fontSize: '15px', fontWeight: 700 }}
-                  placeholder={lang === 'ta' ? 'எ.கா: வெள்ளையம்மா w/o கரிகாலன்' : 'e.g. Vellaiyamma'}
+                  placeholder={lang === 'ta' ? 'வாடிக்கையாளர் பெயர் உள்ளிடுக...' : 'Enter borrower name...'}
                   value={name}
                   onChange={e => setName(e.target.value)}
                 />
@@ -212,7 +270,7 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
                   type="tel"
                   className="form-input font-mono"
                   style={{ height: '42px', fontSize: '14.5px', fontWeight: 600 }}
-                  placeholder="9585194934"
+                  placeholder={lang === 'ta' ? 'தொலைபேசி எண் உள்ளிடுக...' : 'Enter phone number...'}
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                 />
@@ -227,7 +285,7 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
                   type="text"
                   className="form-input"
                   style={{ height: '42px', fontSize: '14.5px' }}
-                  placeholder={lang === 'ta' ? 'அலங்காநல்லூர்' : 'Alanganallur'}
+                  placeholder={lang === 'ta' ? 'ஊர் அல்லது முகவரி உள்ளிடுக...' : 'Enter village or address...'}
                   value={address}
                   onChange={e => setAddress(e.target.value)}
                 />
@@ -314,10 +372,22 @@ export default function ClientFormModal({ clientToEdit, monthYear, onSaved, onCl
             ) : <div />}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <button type="button" onClick={onClose} className="btn btn-secondary btn-sm" style={{ height: '38px' }}>
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn btn-secondary btn-sm"
+                style={{ height: '38px' }}
+                aria-label={t('btn_cancel') || 'Cancel'}
+              >
                 {t('btn_cancel')}
               </button>
-              <button type="submit" disabled={loading} className="btn btn-primary btn-sm" style={{ height: '38px', fontWeight: 750 }}>
+              <button
+                type="submit"
+                disabled={loading || isBlockedFromSaving}
+                className={`btn btn-primary btn-sm ${isBlockedFromSaving ? 'btn-disabled' : ''}`}
+                style={{ height: '38px', fontWeight: 750, cursor: isBlockedFromSaving ? 'not-allowed' : 'pointer' }}
+                title={isBlockedFromSaving ? (lang === 'ta' ? 'நகல் வாடிக்கையாளர் தடுக்கப்பட்டது' : 'Duplicate client blocked') : undefined}
+              >
                 <Save size={16} />
                 <span>{loading ? 'சேமிக்கிறது...' : t('btn_save')}</span>
               </button>

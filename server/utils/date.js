@@ -14,8 +14,14 @@ export function sanitizeMonthYear(val) {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+export function getCurrentMonthYear() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export function getDaysInMonth(monthYear) {
   const safe = sanitizeMonthYear(monthYear);
   const [y, m] = safe.split('-').map(Number);
   return (y && m) ? new Date(y, m, 0).getDate() : 31;
 }
+

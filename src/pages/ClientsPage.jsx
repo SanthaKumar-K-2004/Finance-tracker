@@ -78,6 +78,13 @@ export default function ClientsPage({ activeMonth }) {
   };
 
   const [filterSegment, setFilterSegment] = useState('all'); // 'all' | 'active' | 'cleared' | 'with_phone'
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
+
+  // Reset page to 1 when filters or search change
+  useEffect(() => {
+    setPage(1);
+  }, [search, filterSegment]);
 
   const filtered = clients.filter(c => {
     const matchesSearch = 
@@ -95,6 +102,9 @@ export default function ClientsPage({ activeMonth }) {
     if (filterSegment === 'with_phone') return !!c.phone;
     return true;
   });
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
+  const paginatedClients = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -202,7 +212,7 @@ export default function ClientsPage({ activeMonth }) {
                   </td>
                 </tr>
               ) : (
-                filtered.map(c => (
+                paginatedClients.map(c => (
                   <tr key={c.id}>
                     <td
                       className="font-mono clickable-edit-cell"
@@ -353,7 +363,7 @@ export default function ClientsPage({ activeMonth }) {
             {lang === 'ta' ? 'வாடிக்கையாளர்கள் இல்லை' : 'No clients found'}
           </div>
         ) : (
-          filtered.map(c => (
+          paginatedClients.map(c => (
             <div key={c.id} className="borrower-mobile-card">
               {/* Top Header: Sl. No, Name, and Principal */}
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
@@ -487,6 +497,56 @@ export default function ClientsPage({ activeMonth }) {
           ))
         )}
       </div>
+
+      {/* Modern High-Performance Pagination Bar */}
+      {totalPages > 1 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '10px 16px',
+            background: 'var(--bg-surface)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-subtle)',
+            boxShadow: 'var(--shadow-sm)',
+            flexWrap: 'wrap',
+            gap: '8px'
+          }}
+        >
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+            {lang === 'ta'
+              ? `காட்டப்படுகிறது ${(page - 1) * PAGE_SIZE + 1} - ${Math.min(page * PAGE_SIZE, filtered.length)} (மொத்தம் ${filtered.length} பேர்)`
+              : `Showing ${(page - 1) * PAGE_SIZE + 1} - ${Math.min(page * PAGE_SIZE, filtered.length)} of ${filtered.length} borrowers`}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              type="button"
+              disabled={page === 1}
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              className="btn btn-secondary btn-sm"
+              style={{ height: '32px', padding: '0 12px', fontWeight: 700 }}
+            >
+              {lang === 'ta' ? '← முந்தைய' : '← Prev'}
+            </button>
+            <span
+              className="badge badge-indigo font-mono"
+              style={{ padding: '6px 12px', fontSize: '12px', fontWeight: 800 }}
+            >
+              {page} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page === totalPages}
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              className="btn btn-secondary btn-sm"
+              style={{ height: '32px', padding: '0 12px', fontWeight: 700 }}
+            >
+              {lang === 'ta' ? 'அடுத்த →' : 'Next →'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {showAddModal && (
         <ClientFormModal

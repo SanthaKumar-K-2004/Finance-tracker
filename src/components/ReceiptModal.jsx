@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useCompany } from '../context/CompanyContext';
 import { 
@@ -100,6 +100,26 @@ export default function ReceiptModal({ client, totalDays: propTotalDays, mode = 
   const [btState, setBtState] = useState({ loading: false, message: '', error: '' });
   const [receiptFormat, setReceiptFormat] = useState('detailed'); // 'detailed' | 'concise'
   const [rollSize, setRollSize] = useState('80mm'); // '80mm' | '58mm'
+  const timersRef = useRef([]);
+
+  // Escape key to close dialog & cleanup all active timeouts on unmount to prevent memory leaks
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      window.removeEventListener('keydown', handleEsc);
+      timersRef.current.forEach(t => clearTimeout(t));
+      timersRef.current = [];
+    };
+  }, [onClose]);
+
+  const safeSetTimeout = (fn, delay) => {
+    const id = setTimeout(fn, delay);
+    timersRef.current.push(id);
+    return id;
+  };
 
   // Extract initial payment amount from props
   const getInitialPayment = (c) => {
@@ -368,7 +388,7 @@ Contact: ${shopPhone}
   const handleCopy = () => {
     navigator.clipboard.writeText(activeText);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    safeSetTimeout(() => setCopied(false), 2000);
   };
 
   const handlePrint = () => {
@@ -382,11 +402,11 @@ Contact: ${shopPhone}
         setBtState(prev => ({ ...prev, message: prog.message }));
       });
       setBtState({ loading: false, message: receiptLang === 'ta' ? `✓ ${result.deviceName}-ல் அச்சிடப்பட்டது!` : `✓ Printed to ${result.deviceName}!`, error: '' });
-      setTimeout(() => setBtState({ loading: false, message: '', error: '' }), 4000);
+      safeSetTimeout(() => setBtState({ loading: false, message: '', error: '' }), 4000);
     } catch (err) {
       console.warn('Bluetooth print notice:', err);
       setBtState({ loading: false, message: '', error: err.message });
-      setTimeout(() => setBtState(prev => ({ ...prev, error: '' })), 6000);
+      safeSetTimeout(() => setBtState(prev => ({ ...prev, error: '' })), 6000);
     }
   };
 
@@ -523,6 +543,7 @@ Contact: ${shopPhone}
                 <button
                   type="button"
                   onClick={() => setReceiptFormat('detailed')}
+                  aria-pressed={receiptFormat === 'detailed'}
                   style={{
                     padding: '2px 8px',
                     fontSize: '11px',
@@ -539,6 +560,7 @@ Contact: ${shopPhone}
                 <button
                   type="button"
                   onClick={() => setReceiptFormat('concise')}
+                  aria-pressed={receiptFormat === 'concise'}
                   style={{
                     padding: '2px 8px',
                     fontSize: '11px',
@@ -562,6 +584,7 @@ Contact: ${shopPhone}
               <button
                 type="button"
                 onClick={() => setRollSize('80mm')}
+                aria-pressed={rollSize === '80mm'}
                 style={{
                   padding: '2px 6px',
                   fontSize: '11px',
@@ -578,6 +601,7 @@ Contact: ${shopPhone}
               <button
                 type="button"
                 onClick={() => setRollSize('58mm')}
+                aria-pressed={rollSize === '58mm'}
                 style={{
                   padding: '2px 6px',
                   fontSize: '11px',
@@ -628,9 +652,11 @@ Contact: ${shopPhone}
 
               {/* Native Date Input Picker linked to activeReceiptDate */}
               <input
+                id="receipt-custom-date"
                 type="date"
                 value={formatToHtmlDate(receiptDate)}
                 onChange={handleCustomDateChange}
+                aria-label={receiptLang === 'ta' ? 'ரசீது தேதி தேர்வு' : 'Receipt Date Selection'}
                 style={{
                   padding: '2px 8px',
                   fontSize: '12px',
@@ -689,7 +715,7 @@ Contact: ${shopPhone}
           {receiptType === 'collection' && (
             <div className="receipt-pay-input-card">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <label style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                <label htmlFor="receipt-payment-amount" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
                   {receiptLang === 'ta' ? '💵 இன்றைய தவணை வரவு (Current Payment):' : '💵 Today\'s Payment Received:'}
                 </label>
                 <span className="badge badge-emerald font-mono" style={{ fontSize: '13px', fontWeight: 800 }}>
@@ -701,11 +727,13 @@ Contact: ${shopPhone}
                 <div style={{ position: 'relative', flex: 1 }}>
                   <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: 'var(--text-secondary)' }}>₹</span>
                   <input
+                    id="receipt-payment-amount"
                     type="number"
                     min="0"
                     value={paymentAmount}
                     onChange={(e) => setPaymentAmount(e.target.value)}
                     placeholder="0"
+                    aria-label={receiptLang === 'ta' ? 'இன்றைய தவணை வரவு தொகை' : "Today's payment received amount"}
                     className="form-input"
                     style={{
                       paddingLeft: '26px',

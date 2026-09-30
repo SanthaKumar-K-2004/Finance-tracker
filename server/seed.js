@@ -94,9 +94,14 @@ async function seed() {
       console.log(`  👤 Added client [${slNo}] ${name}`);
     } else {
       actualClientId = existing[0].id;
+      await execute(
+        `UPDATE clients SET name = ?, phone = ?, address = ?, status = 'active' WHERE id = ?`,
+        [name, phone, address, actualClientId]
+      );
+      console.log(`  👤 Restored client [${slNo}] ${name} to active`);
     }
 
-    // Insert loan cycle for May 2026
+    // Insert loan cycle for May 2026 (Historical Baseline & Audit)
     const existingCycle = await query(
       'SELECT id FROM loan_cycles WHERE company_id = ? AND client_id = ? AND month_year = ?',
       [companyId, actualClientId, '2026-05']
@@ -120,6 +125,41 @@ async function seed() {
       );
     } else {
       actualCycleId = existingCycle[0].id;
+    }
+
+    // Also insert/ensure loan cycle for current calendar month
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonthNum = String(now.getMonth() + 1).padStart(2, '0');
+    const curMonthYear = `${curYear}-${curMonthNum}`;
+    const curDays = new Date(curYear, now.getMonth() + 1, 0).getDate();
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const curCycleName = `${monthNames[now.getMonth()]} ${curYear}`;
+
+    if (curMonthYear !== '2026-05') {
+      const curCycleId = `cycle_${slNo}_${curMonthYear.replace('-', '_')}`;
+      const existingCurCycle = await query(
+        'SELECT id FROM loan_cycles WHERE company_id = ? AND client_id = ? AND month_year = ?',
+        [companyId, actualClientId, curMonthYear]
+      );
+      if (existingCurCycle.length === 0) {
+        await execute(
+          `INSERT INTO loan_cycles (id, company_id, client_id, month_year, cycle_name, principal, start_date, end_date, total_days, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
+          [
+            curCycleId,
+            companyId,
+            actualClientId,
+            curMonthYear,
+            curCycleName,
+            principal,
+            `${curMonthYear}-01`,
+            `${curMonthYear}-${String(curDays).padStart(2, '0')}`,
+            curDays
+          ]
+        );
+        console.log(`  📅 Created current month cycle (${curMonthYear}) for [${slNo}] ${name}`);
+      }
     }
 
     // Days 1 through 31 are columns index 6 to 36
@@ -149,7 +189,12 @@ async function seed() {
   console.log(`\n🎉 Seed completed! Imported ${importedCount} client records into Turso Database.`);
 }
 
-seed().catch(err => {
-  console.error('❌ Seed error:', err);
-  process.exit(1);
-});
+export { seed, seed as seedData };
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  seed().catch(err => {
+    console.error('❌ Seed error:', err);
+    process.exit(1);
+  });
+}
+

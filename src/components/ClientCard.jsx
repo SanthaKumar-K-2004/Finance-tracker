@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { 
-  Phone, 
-  MapPin, 
-  MessageSquare, 
-  Printer, 
-  CheckCircle2, 
-  PlusCircle, 
-  Edit, 
-  Trash2, 
-  Lock, 
-  Unlock, 
-  Sparkles, 
-  Calendar, 
-  Clock, 
+import {
+  Phone,
+  MapPin,
+  MessageSquare,
+  Printer,
+  CheckCircle2,
+  PlusCircle,
+  Edit,
+  Trash2,
+  Lock,
+  Unlock,
+  Sparkles,
+  Calendar,
+  Clock,
   Check,
   RotateCcw,
   SlidersHorizontal

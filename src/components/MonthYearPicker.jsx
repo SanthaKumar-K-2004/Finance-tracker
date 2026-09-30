@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { getCurrentMonthYear, isCurrentCalendarMonth } from '../utils/date';
 import { Calendar, ChevronLeft, ChevronRight, Check, Sparkles, Clock, X } from 'lucide-react';
 
 // Tamil Month Map (Standard Gregorian Tamil names for register clarity)
@@ -107,8 +108,7 @@ export default function MonthYearPicker({ activeMonth, onSelectMonth, monthsList
 
   // Jump to today's month
   const handleJumpToCurrent = () => {
-    const today = new Date();
-    const formatted = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const formatted = getCurrentMonthYear();
     onSelectMonth(formatted);
     setIsOpen(false);
   };
@@ -140,7 +140,7 @@ export default function MonthYearPicker({ activeMonth, onSelectMonth, monthsList
             height: '34px',
             padding: '0 10px',
             background: isOpen ? 'var(--bg-surface-active)' : 'var(--bg-surface)',
-            border: `1.5px solid ${isOpen ? 'var(--emerald-primary)' : 'var(--border-strong)'}`,
+            border: `1.5px solid ${isOpen ? 'var(--emerald-primary)' : isCurrentCalendarMonth(activeMonth) ? 'var(--emerald-border, #10b981)' : 'var(--border-strong)'}`,
             borderRadius: 'var(--radius-md)',
             color: 'var(--text-primary)',
             fontSize: '13px',
@@ -151,15 +151,40 @@ export default function MonthYearPicker({ activeMonth, onSelectMonth, monthsList
           }}
           title={lang === 'ta' ? 'மாதம் & ஆண்டு தேர்ந்தெடுக்க கிளிக் செய்க' : 'Click to select Month & Year'}
         >
-          <Calendar size={14} color="var(--emerald-primary)" />
+          <Calendar size={14} color={isCurrentCalendarMonth(activeMonth) ? "var(--emerald-primary)" : "var(--indigo-primary)"} />
           <span>{activeTitle}</span>
           <span
-            className="badge badge-emerald font-mono"
+            className={`badge ${isCurrentCalendarMonth(activeMonth) ? 'badge-emerald' : 'badge-indigo'} font-mono`}
             style={{ fontSize: '10.5px', padding: '1px 5px', height: '18px', fontWeight: 800 }}
           >
             {currentDaysCount}d
           </span>
         </button>
+
+        {/* Quick Jump to Current Month Button if viewing older/future month */}
+        {!isCurrentCalendarMonth(activeMonth) && (
+          <button
+            type="button"
+            onClick={handleJumpToCurrent}
+            className="btn btn-secondary btn-sm"
+            style={{
+              height: '34px',
+              padding: '0 8px',
+              fontSize: '11px',
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              color: 'var(--indigo-primary)',
+              borderColor: 'var(--indigo-border)',
+              background: 'var(--bg-surface)'
+            }}
+            title={lang === 'ta' ? 'நடப்பு மாதத்திற்கு திரும்புக' : 'Jump to Current Month'}
+          >
+            <Clock size={13} />
+            <span className="desktop-only">{lang === 'ta' ? 'இன்றைய மாதம்' : 'Current'}</span>
+          </button>
+        )}
 
         {/* Step Next Button */}
         <button

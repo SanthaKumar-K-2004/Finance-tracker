@@ -14,8 +14,10 @@ import reportsRouter from './routes/reports.js';
 import excelRouter from './routes/excel.js';
 import backupRouter from './routes/backup.js';
 import companyRouter from './routes/company.js';
+import bigqueryRouter from './routes/bigquery.js';
 
 import { securityHeaders, corsOriginCheck, createRateLimiter } from './middleware/security.js';
+import { idempotencyMiddleware } from './middleware/idempotency.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,6 +74,7 @@ const sensitiveLimiter = createRateLimiter({
 });
 
 app.use('/api', apiLimiter);
+app.use('/api', idempotencyMiddleware);
 app.use('/api/backup/restore', sensitiveLimiter);
 app.use('/api/backup/restore-db', sensitiveLimiter);
 
@@ -109,6 +112,7 @@ app.use('/api/reports', reportsRouter);
 app.use('/api/excel', excelRouter);
 app.use('/api/backup', backupRouter);
 app.use('/api/company', companyRouter);
+app.use('/api/bigquery', bigqueryRouter);
 
 // Serve uploaded assets statically
 const uploadsDir = process.env.VERCEL ? path.resolve('/tmp', 'uploads') : path.resolve(__dirname, '../data/uploads');

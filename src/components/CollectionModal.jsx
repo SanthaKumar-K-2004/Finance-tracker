@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { X, CheckCircle, IndianRupee } from 'lucide-react';
 
@@ -16,6 +16,15 @@ export default function CollectionModal({
   const [paymentMode, setPaymentMode] = useState('cash');
   const [notes, setNotes] = useState('');
   const expectedDaily = Math.ceil((client.principal || 0) / totalDays);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -167,6 +176,7 @@ export default function CollectionModal({
                     key={mode.id}
                     type="button"
                     onClick={() => setPaymentMode(mode.id)}
+                    aria-pressed={paymentMode === mode.id}
                     className={`btn btn-sm ${paymentMode === mode.id ? 'btn-primary' : 'btn-secondary'}`}
                     style={{ height: '36px', fontSize: '12px', justifyContent: 'center' }}
                   >
@@ -186,14 +196,19 @@ export default function CollectionModal({
                 type="text"
                 className="form-input"
                 value={notes}
-                placeholder={lang === 'ta' ? 'எ.கா: வாடிக்கையாளர் கடைக்கு வந்து கொடுத்தார்' : 'e.g. Paid at shop'}
+                placeholder={lang === 'ta' ? 'குறிப்பு உள்ளிடுக...' : 'Enter note...'}
                 onChange={e => setNotes(e.target.value)}
               />
             </div>
           </div>
 
           <div className="modal-footer">
-            <button type="button" onClick={onClose} className="btn btn-secondary btn-sm">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-secondary btn-sm"
+              aria-label={t('btn_cancel') || 'Cancel'}
+            >
               {t('btn_cancel')}
             </button>
             <button type="submit" className="btn btn-primary btn-sm">

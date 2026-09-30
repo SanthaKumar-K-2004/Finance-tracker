@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { X, CheckCircle, Calculator, Printer } from 'lucide-react';
 
@@ -16,6 +16,19 @@ export default function CashDenominationModal({ onClose }) {
   const [expectedAmount, setExpectedAmount] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const closeTimerRef = useRef(null);
+
+  // Close on Escape key and clean up timeout on unmount
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      window.removeEventListener('keydown', handleEsc);
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, [onClose]);
 
   // Fetch today's expected collection
   useEffect(() => {
@@ -59,7 +72,7 @@ export default function CashDenominationModal({ onClose }) {
       const data = await res.json();
       if (data.success) {
         setSavedSuccess(true);
-        setTimeout(() => {
+        closeTimerRef.current = setTimeout(() => {
           onClose();
         }, 1500);
       }
@@ -203,7 +216,12 @@ export default function CashDenominationModal({ onClose }) {
 
         {!savedSuccess && (
           <div className="modal-footer">
-            <button type="button" onClick={onClose} className="btn btn-secondary btn-sm">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn btn-secondary btn-sm"
+              aria-label={t('btn_cancel') || 'Cancel'}
+            >
               {t('btn_cancel')}
             </button>
             <button

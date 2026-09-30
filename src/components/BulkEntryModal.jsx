@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { X, Users, CheckSquare, Square, Search, Layers, CheckCircle2, AlertCircle } from 'lucide-react';
 
@@ -22,6 +22,15 @@ export default function BulkEntryModal({
   const [selectedIds, setSelectedIds] = useState(() => new Set(clients.filter(c => !c.is_cleared).map(c => c.cycle_id)));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
 
   // Filter clients for bulk selection
   const filteredClients = useMemo(() => {
@@ -165,8 +174,8 @@ export default function BulkEntryModal({
             {/* Inputs: Day & Amount */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '10px', marginBottom: '12px' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">{lang === 'ta' ? 'வசூல் நாள் (Day)' : 'Collection Day'}</label>
-                <select className="form-select font-mono" value={day} onChange={e => setDay(parseInt(e.target.value, 10))}>
+                <label htmlFor="bulk-day-select" className="form-label">{lang === 'ta' ? 'வசூல் நாள் (Day)' : 'Collection Day'}</label>
+                <select id="bulk-day-select" className="form-select font-mono" value={day} onChange={e => setDay(parseInt(e.target.value, 10))}>
                   {Array.from({ length: totalDays }, (_, i) => i + 1).map(d => (
                     <option key={d} value={d}>
                       Day {d} {d === todayDay ? (lang === 'ta' ? '(இன்று)' : '(Today)') : ''}
@@ -176,10 +185,11 @@ export default function BulkEntryModal({
               </div>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">{lang === 'ta' ? 'தவணைத் தொகை (Amount ₹)' : 'Amount per Client (₹)'}</label>
+                <label htmlFor="bulk-amount-input" className="form-label">{lang === 'ta' ? 'தவணைத் தொகை (Amount ₹)' : 'Amount per Client (₹)'}</label>
                 <div style={{ position: 'relative' }}>
                   <span style={{ position: 'absolute', left: '10px', top: '9px', fontWeight: 700, color: 'var(--text-muted)' }}>₹</span>
                   <input
+                    id="bulk-amount-input"
                     type="number"
                     min="10"
                     step="10"
@@ -222,6 +232,7 @@ export default function BulkEntryModal({
                     key={m.id}
                     type="button"
                     onClick={() => setPaymentMode(m.id)}
+                    aria-pressed={paymentMode === m.id}
                     className={`btn btn-sm ${paymentMode === m.id ? 'btn-primary' : 'btn-secondary'}`}
                     style={{ height: '32px', fontSize: '11px', padding: '0 4px', justifyContent: 'center' }}
                   >
@@ -253,6 +264,7 @@ export default function BulkEntryModal({
                 <input
                   type="text"
                   className="form-input"
+                  aria-label={lang === 'ta' ? 'வாடிக்கையாளரைத் தேட' : 'Filter borrowers list'}
                   placeholder={lang === 'ta' ? 'வாடிக்கையாளரைத் தேட...' : 'Filter borrowers list...'}
                   style={{ paddingLeft: '30px', height: '34px', fontSize: '12px' }}
                   value={search}
@@ -323,7 +335,12 @@ export default function BulkEntryModal({
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button type="button" onClick={onClose} className="btn btn-secondary btn-sm">
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn btn-secondary btn-sm"
+                aria-label={t('btn_cancel') || 'Cancel'}
+              >
                 {t('btn_cancel')}
               </button>
               <button

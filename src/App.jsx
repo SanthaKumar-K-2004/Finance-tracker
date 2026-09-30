@@ -5,6 +5,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { CompanyProvider } from './context/CompanyContext';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
+import { getSessionActiveMonth, setSessionActiveMonth, getCurrentMonthYear } from './utils/date';
 
 // Primary View - Loaded synchronously for instant LCP on root /
 import CollectionPage from './pages/CollectionPage';
@@ -28,20 +29,12 @@ function PageSkeleton() {
 }
 
 export default function App() {
-  const [activeMonth, setActiveMonthState] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('alr_active_month');
-      if (saved) return saved;
-    }
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  });
+  const [activeMonth, setActiveMonthState] = useState(() => getSessionActiveMonth());
 
   const setActiveMonth = useCallback((m) => {
+    if (!m) return;
     setActiveMonthState(m);
-    if (typeof window !== 'undefined' && m) {
-      localStorage.setItem('alr_active_month', m);
-    }
+    setSessionActiveMonth(m);
   }, []);
 
   const [viewMode, setViewMode] = useState('auto'); // auto, grid, card
@@ -54,19 +47,16 @@ export default function App() {
       const data = await res.json();
       if (data.success && data.data) {
         setMonthsList(data.data);
-        setActiveMonthState(curr => {
-          if (data.data.length > 0 && !data.data.some(m => m.month_year === curr)) {
-            const fallbackMonth = data.data[0].month_year;
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('alr_active_month', fallbackMonth);
-            }
-            return fallbackMonth;
-          }
-          return curr;
-        });
       }
     } catch (err) {
       console.error('Failed to load months:', err);
+    }
+  }, []);
+
+  // Clean up legacy localStorage item so it never resurrects old months
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try { localStorage.removeItem('alr_active_month'); } catch (_) {}
     }
   }, []);
 

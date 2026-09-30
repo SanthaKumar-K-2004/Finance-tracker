@@ -2,10 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useTheme } from '../context/ThemeContext';
 import { useCompany } from '../context/CompanyContext';
-import { 
-  Settings, Database, Download, Upload, ShieldCheck, Moon, Sun, 
-  Clock, Languages, Store, CheckCircle, AlertCircle, Edit3, Save, 
-  X, Image as ImageIcon, Trash2, Camera, Sparkles, Check
+import {
+  Settings, Database, Download, Upload, ShieldCheck, Moon, Sun,
+  Clock, Languages, Store, CheckCircle, AlertCircle, Edit3, Save,
+  X, Image as ImageIcon, Trash2, Camera, Sparkles, Check, Lock, Eye, EyeOff, AlertTriangle
 } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -15,6 +15,15 @@ export default function SettingsPage() {
   const [dbStatus, setDbStatus] = useState(null);
   const [restoreMessage, setRestoreMessage] = useState(null);
   const [restoring, setRestoring] = useState(false);
+
+  // Master Clear Data & Cache State (PIN 940494 with Double-Verification)
+  const [showClearModal, setShowClearModal] = useState(false);
+  const [clearPin, setClearPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
+  const [clearConfirmed, setClearConfirmed] = useState(false);
+  const [clearLoading, setClearLoading] = useState(false);
+  const [clearMessage, setClearMessage] = useState(null);
+  const [clearBanner, setClearBanner] = useState(null);
 
   // Logo upload state
   const fileInputRef = useRef(null);
@@ -91,8 +100,8 @@ export default function SettingsPage() {
     if (!validTypes.includes(file.type)) {
       setLogoMessage({
         type: 'error',
-        text: lang === 'ta' 
-          ? 'செல்லுபடியாகும் படம் மட்டுமே ஏற்கப்படும் (PNG, JPG, WEBP, SVG).' 
+        text: lang === 'ta'
+          ? 'செல்லுபடியாகும் படம் மட்டுமே ஏற்கப்படும் (PNG, JPG, WEBP, SVG).'
           : 'Please select a valid image (PNG, JPG, WEBP, SVG).'
       });
       return;
@@ -222,6 +231,115 @@ export default function SettingsPage() {
     window.location.href = '/api/backup/download-db';
   };
 
+  const handleClearAllData = async (e) => {
+    e.preventDefault();
+    if (!clearConfirmed) {
+      setClearMessage({
+        type: 'error',
+        text: lang === 'ta'
+          ? 'தொடர உறுதிப்படுத்தல் தேர்வுப்பெட்டியைத் தேர்ந்தெடுக்கவும்.'
+          : 'Please check the confirmation box to proceed.'
+      });
+      return;
+    }
+
+    if (!clearPin || clearPin.trim() !== '940494') {
+      setClearMessage({
+        type: 'error',
+        text: lang === 'ta'
+          ? 'தவறான பாதுகாப்பு பின் (PIN). மாஸ்டர் பின் 940494 ஐ உள்ளிடவும்.'
+          : 'Invalid Security PIN. Please enter master PIN 940494.'
+      });
+      return;
+    }
+
+    try {
+      setClearLoading(true);
+      setClearMessage(null);
+
+      const res = await fetch('/api/backup/clear-all-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pin: clearPin.trim(),
+          confirmation: 'CONFIRM_CLEAR_ALL_DATA'
+        })
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        setClearMessage({
+          type: 'error',
+          text: data.error || (lang === 'ta' ? 'அழிக்க முடியவில்லை' : 'Failed to clear data')
+        });
+      } else {
+        setClearBanner({
+          type: 'success',
+          text: lang === 'ta'
+            ? 'அனைத்து தரவுகளும் வெற்றிகரமாக அழிக்கப்பட்டு, சர்வர் கேச் நீக்கப்பட்டது!'
+            : 'All data successfully cleared and server cache purged!'
+        });
+        loadStatus();
+        setTimeout(() => {
+          setShowClearModal(false);
+          setClearPin('');
+          setClearConfirmed(false);
+          setClearMessage(null);
+        }, 1200);
+      }
+    } catch (err) {
+      setClearMessage({ type: 'error', text: err.message });
+    } finally {
+      setClearLoading(false);
+    }
+  };
+
+  // BigQuery Data Transfer Service (DTS) Integration State
+  const [bqStatus, setBqStatus] = useState(null);
+  const [bqLoading, setBqLoading] = useState(false);
+  const [bqMessage, setBqMessage] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/bigquery/status')
+      .then(r => r.json())
+      .then(d => { if (d.success) setBqStatus(d); })
+      .catch(console.error);
+  }, []);
+
+  const handleDownloadDeploymentYaml = () => {
+    window.location.href = '/api/bigquery/deployment-config';
+  };
+
+  const handleExportBigQueryJsonl = async () => {
+    try {
+      setBqLoading(true);
+      setBqMessage(null);
+      const res = await fetch('/api/bigquery/export-jsonl', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        const blob = new Blob([JSON.stringify(data.files, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `alr_bigquery_dts_package_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setBqMessage({
+          type: 'success',
+          text: lang === 'ta'
+            ? 'BigQuery DTS தொகுப்பு வெற்றிகரமாக உருவாக்கப்பட்டு பதிவிறக்கப்பட்டது!'
+            : 'BigQuery DTS package exported & downloaded successfully!'
+        });
+      } else {
+        setBqMessage({ type: 'error', text: data.error || 'Export failed' });
+      }
+    } catch (err) {
+      setBqMessage({ type: 'error', text: err.message });
+    } finally {
+      setBqLoading(false);
+    }
+  };
+
   const handleRestoreFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -339,11 +457,11 @@ export default function SettingsPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px', alignItems: 'center' }}>
           {/* Logo Visual Live Preview */}
-          <div 
-            style={{ 
-              background: 'var(--bg-surface-hover)', 
-              borderRadius: 'var(--radius-lg)', 
-              padding: '16px', 
+          <div
+            style={{
+              background: 'var(--bg-surface-hover)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '16px',
               border: '1px solid var(--border-subtle)',
               display: 'flex',
               flexDirection: 'column',
@@ -355,7 +473,7 @@ export default function SettingsPage() {
             </span>
 
             {/* Header Simulator Preview */}
-            <div 
+            <div
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -367,7 +485,7 @@ export default function SettingsPage() {
                 boxShadow: 'var(--shadow-sm)'
               }}
             >
-              <div 
+              <div
                 style={{
                   width: '44px',
                   height: '44px',
@@ -451,7 +569,7 @@ export default function SettingsPage() {
                 transition: 'all 0.2s ease'
               }}
             >
-              <div 
+              <div
                 style={{
                   width: '42px',
                   height: '42px',
@@ -567,7 +685,7 @@ export default function SettingsPage() {
                 value={profileForm.name}
                 onChange={(e) => setProfileForm(prev => ({ ...prev, name: e.target.value }))}
                 style={!isEditingProfile ? { background: 'var(--bg-surface-hover)', cursor: 'default' } : { borderColor: 'var(--emerald-primary)' }}
-                placeholder="ALR Finance (ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ்)"
+                placeholder={lang === 'ta' ? 'கடை / நிறுவனப் பெயர் உள்ளிடுக...' : 'Enter shop name...'}
               />
             </div>
             <div>
@@ -581,7 +699,7 @@ export default function SettingsPage() {
                 value={profileForm.phone}
                 onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
                 style={!isEditingProfile ? { background: 'var(--bg-surface-hover)', cursor: 'default' } : { borderColor: 'var(--emerald-primary)' }}
-                placeholder="9585194934"
+                placeholder={lang === 'ta' ? 'தொலைபேசி எண் உள்ளிடுக...' : 'Enter phone number...'}
               />
             </div>
             <div>
@@ -594,7 +712,7 @@ export default function SettingsPage() {
                 value={profileForm.tagline}
                 onChange={(e) => setProfileForm(prev => ({ ...prev, tagline: e.target.value }))}
                 style={!isEditingProfile ? { background: 'var(--bg-surface-hover)', cursor: 'default' } : { borderColor: 'var(--emerald-primary)' }}
-                placeholder="ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ் • அலங்காநல்லூர்"
+                placeholder={lang === 'ta' ? 'கிளை அல்லது துணைப் பெயர் உள்ளிடுக...' : 'Enter branch or tagline...'}
               />
             </div>
             <div>
@@ -608,7 +726,7 @@ export default function SettingsPage() {
                 value={profileForm.address}
                 onChange={(e) => setProfileForm(prev => ({ ...prev, address: e.target.value }))}
                 style={!isEditingProfile ? { background: 'var(--bg-surface-hover)', cursor: 'default' } : { borderColor: 'var(--emerald-primary)' }}
-                placeholder="அலங்காநல்லூர், மதுரை (Alanganallur, Madurai)"
+                placeholder={lang === 'ta' ? 'கடை முகவரி உள்ளிடுக...' : 'Enter shop address...'}
               />
             </div>
           </div>
@@ -740,6 +858,91 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Enterprise BigQuery Data Transfer Service (DTS) & Warehouse Integration */}
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: 700 }}>
+            <Database size={18} color="var(--indigo-primary)" />
+            <span>{lang === 'ta' ? 'கூகிள் பிக்குவெரி & டேட்டா வேர்ஹவுஸ் (BigQuery DTS)' : 'Google BigQuery Data Warehouse (DTS)'}</span>
+          </div>
+          <span className="badge badge-indigo font-mono" style={{ fontSize: '11px' }}>
+            Enterprise Scale (Billion Rows)
+          </span>
+        </div>
+
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.6 }}>
+          {lang === 'ta'
+            ? 'அதிக அளவிலான தரவுகளை (100,000+ வாடிக்கையாளர்கள் மற்றும் பல ஆண்டுகால தவணைகள்) பாதுகாப்பாகக் கையாள கூகிள் கிளவுட் பிக்குவெரி (BigQuery Data Transfer Service) வழியாக தரவுகளை தானியங்கி முறையில் சேமித்து விரிவான ஆய்வுகள் மேற்கொள்ளலாம்.'
+            : 'Automate high-volume financial ledger synchronization into Google Cloud BigQuery. Enables multi-year historical analytics, credit scoring, and multi-branch rollups via BigQuery Data Transfer Service (DTS).'}
+        </p>
+
+        {bqMessage && (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '13px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '14px',
+              background: bqMessage.type === 'success' ? 'var(--emerald-light)' : 'var(--rose-light)',
+              color: bqMessage.type === 'success' ? 'var(--emerald-text)' : 'var(--rose-text)',
+              border: `1px solid ${bqMessage.type === 'success' ? 'var(--emerald-border)' : 'var(--rose-border)'}`
+            }}
+          >
+            {bqMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+            <span>{bqMessage.text}</span>
+          </div>
+        )}
+
+        {bqStatus && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginBottom: '16px' }}>
+            <div style={{ padding: '10px 12px', background: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>PARTITION STRATEGY</div>
+              <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>DAY on collection_date</div>
+            </div>
+            <div style={{ padding: '10px 12px', background: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>CLUSTERING COLUMNS</div>
+              <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>cycle_id, client_id</div>
+            </div>
+            <div style={{ padding: '10px 12px', background: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>DTS CONNECTOR</div>
+              <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>google_cloud_storage</div>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={handleExportBigQueryJsonl}
+            disabled={bqLoading}
+            className="btn btn-primary"
+            style={{ height: '42px', flex: 1, minWidth: '220px' }}
+          >
+            <Download size={16} />
+            <span>
+              {bqLoading
+                ? (lang === 'ta' ? 'தயாராகிறது...' : 'Generating...')
+                : (lang === 'ta' ? 'BigQuery JSONL ஏற்றுமதி செய்' : 'Export BigQuery JSONL Stream')}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadDeploymentYaml}
+            className="btn btn-secondary"
+            style={{ height: '42px', flex: 1, minWidth: '200px' }}
+            title="Download GCP pipeline deployment.yaml for BigQuery DTS"
+          >
+            <Download size={16} />
+            <span>{lang === 'ta' ? 'DTS deployment.yaml பதிவிறக்கு' : 'Download DTS deployment.yaml'}</span>
+          </button>
+        </div>
+      </div>
+
       {/* Theme & Language Preferences */}
       <div className="card">
         <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '14px' }}>
@@ -748,9 +951,11 @@ export default function SettingsPage() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
           <div>
-            <label className="form-label">{lang === 'ta' ? 'பயன்பாட்டு மொழி (Language)' : 'Default Language'}</label>
+            <label htmlFor="settings-pref-lang" className="form-label">{lang === 'ta' ? 'பயன்பாட்டு மொழி (Language)' : 'Default Language'}</label>
             <select
+              id="settings-pref-lang"
               className="form-select"
+              aria-label={lang === 'ta' ? 'பயன்பாட்டு மொழி' : 'Default Language'}
               value={lang}
               onChange={e => {
                 setLang(e.target.value);
@@ -763,9 +968,11 @@ export default function SettingsPage() {
           </div>
 
           <div>
-            <label className="form-label">{t('theme_title')}</label>
+            <label htmlFor="settings-pref-theme" className="form-label">{t('theme_title')}</label>
             <select
+              id="settings-pref-theme"
               className="form-select"
+              aria-label={t('theme_title')}
               value={themeMode}
               onChange={e => setThemeMode(e.target.value)}
             >
@@ -777,6 +984,234 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Danger Zone: Master Data Reset & Server Cache Purge */}
+      <div className="card" style={{ borderColor: 'var(--rose-border)', background: 'var(--bg-app)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '15px', fontWeight: 700, color: 'var(--rose-text)' }}>
+            <Trash2 size={18} color="var(--rose-primary)" />
+            <span>{lang === 'ta' ? 'ஆபத்து மண்டலம்: முழுத் தரவு அழிப்பு & கேச் நீக்கம்' : 'Danger Zone: Master Data Reset & Cache Purge'}</span>
+          </div>
+          <span className="badge badge-rose font-mono" style={{ fontSize: '11px' }}>
+            {lang === 'ta' ? 'பாதுகாப்பு பின் தேவை (PIN: 940494)' : 'Security PIN Required (940494)'}
+          </span>
+        </div>
+
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.6 }}>
+          {lang === 'ta'
+            ? 'அனைத்து வாடிக்கையாளர்கள், தவணைக் கடன்கள், தினசரி வசூல் பதிவுகள் மற்றும் வாட்ஸ்அப் பதிவுகளை முழுமையாக அழிக்கிறது. மேலும் சர்வர் மெமரி கேச் (Cache) சுத்திகரிக்கப்படும். அழிப்பதற்கு முன் சர்வரில் ஒரு தானியங்கி பாதுகாப்பு காப்புப் பிரதி (Safety Backup) உருவாக்கப்படும்.'
+            : 'Permanently wipes all client borrowers, loan cycles, daily collections, and clears server-side in-memory response caches across Cloud and Local databases. An automated safety backup is saved to the server before purging.'}
+        </p>
+
+        {clearBanner && (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '13px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              marginBottom: '14px',
+              background: clearBanner.type === 'success' ? 'var(--emerald-light)' : 'var(--rose-light)',
+              color: clearBanner.type === 'success' ? 'var(--emerald-text)' : 'var(--rose-text)',
+              border: `1px solid ${clearBanner.type === 'success' ? 'var(--emerald-border)' : 'var(--rose-border)'}`
+            }}
+          >
+            <CheckCircle size={16} />
+            <span>{clearBanner.text}</span>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setShowClearModal(true);
+              setClearMessage(null);
+              setClearPin('');
+              setClearConfirmed(false);
+            }}
+            className="btn btn-secondary"
+            style={{
+              height: '42px',
+              color: 'var(--rose-primary)',
+              borderColor: 'var(--rose-border)',
+              background: 'var(--rose-light)',
+              fontWeight: 750
+            }}
+          >
+            <Trash2 size={16} />
+            <span>{lang === 'ta' ? 'அனைத்து தரவுகளையும் நீக்கு & கேச் அழி (PIN: 940494)' : 'Clear All Data & Purge Cache (PIN: 940494)'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Master Data Reset & Cache Purge Double-Verification Modal */}
+      {showClearModal && (
+        <div className="modal-overlay" onClick={() => !clearLoading && setShowClearModal(false)}>
+          <div
+            className="modal-content"
+            style={{ maxWidth: '500px', border: '1px solid var(--rose-border)' }}
+            onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="clear-modal-title"
+          >
+            <div className="modal-header" style={{ borderBottomColor: 'var(--rose-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={20} color="var(--rose-primary)" />
+                <h2 id="clear-modal-title" className="modal-title" style={{ fontSize: '17px', fontWeight: 800, color: 'var(--rose-text)' }}>
+                  {lang === 'ta' ? 'முழுத் தரவு அழிப்பு & கேச் நீக்கம்' : 'Master Data Reset & Cache Purge'}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => !clearLoading && setShowClearModal(false)}
+                className="btn-icon"
+                disabled={clearLoading}
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleClearAllData}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Warning Alert */}
+                <div style={{ background: 'var(--rose-light)', color: 'var(--rose-text)', padding: '12px 14px', borderRadius: 'var(--radius-md)', fontSize: '13px', lineHeight: 1.5, border: '1px solid var(--rose-border)' }}>
+                  <div style={{ fontWeight: 800, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <AlertCircle size={16} />
+                    <span>{lang === 'ta' ? 'முக்கிய எச்சரிக்கை (Permanent Deletion)' : 'Critical Warning'}</span>
+                  </div>
+                  {lang === 'ta'
+                    ? 'இந்த நடவடிக்கை அனைத்து வாடிக்கையாளர்கள், கடன் தவணைகள், தினசரி வசூல் பதிவுகள், ரசீதுகள் மற்றும் வாட்ஸ்அப் பதிவுகளை நிரந்தரமாக அழிக்கும். மேலும் சர்வர் கேச் (Cache) சுத்திகரிக்கப்படும். அழிக்கும் முன் தானியங்கி பாதுகாப்பு காப்புப் பிரதி எடுக்கப்படும்.'
+                    : 'This action will permanently delete all borrowers, active loan cycles, daily collection entries, settlement slips, and WhatsApp logs. The server in-memory response cache will also be purged. An automated safety backup is saved first.'}
+                </div>
+
+                {clearMessage && (
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: clearMessage.type === 'success' ? 'var(--emerald-light)' : 'var(--rose-light)',
+                    color: clearMessage.type === 'success' ? 'var(--emerald-text)' : 'var(--rose-text)',
+                    border: `1px solid ${clearMessage.type === 'success' ? 'var(--emerald-border)' : 'var(--rose-border)'}`
+                  }}>
+                    {clearMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                    <span>{clearMessage.text}</span>
+                  </div>
+                )}
+
+                {/* Step 1: Confirmation Checkbox */}
+                <div style={{ padding: '12px', background: 'var(--bg-app)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    <input
+                      type="checkbox"
+                      checked={clearConfirmed}
+                      onChange={e => setClearConfirmed(e.target.checked)}
+                      disabled={clearLoading}
+                      style={{ marginTop: '2px', cursor: 'pointer', width: '16px', height: '16px' }}
+                    />
+                    <span>
+                      {lang === 'ta'
+                        ? '1. நான் முழுமையாகப் புரிந்து கொண்டு அனைத்து வாடிக்கையாளர்கள், கடன் தவணைகள் மற்றும் வசூல் பதிவுகளை நிரந்தரமாக அழிக்க உறுதிப்படுத்துகிறேன்.'
+                        : '1. I understand and confirm that all borrowers, cycles, and collection records will be permanently deleted.'}
+                    </span>
+                  </label>
+                </div>
+
+                {/* Step 2: Master Security PIN */}
+                <div className="form-group">
+                  <label htmlFor="clear-security-pin" className="form-label" style={{ fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Lock size={15} color="var(--rose-primary)" />
+                      <span>{lang === 'ta' ? '2. மாஸ்டர் பாதுகாப்பு பின் (PIN: 940494)' : '2. Master Security PIN (PIN: 940494)'}</span>
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>PIN: 940494</span>
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      id="clear-security-pin"
+                      type={showPin ? 'text' : 'password'}
+                      maxLength={6}
+                      value={clearPin}
+                      onChange={e => setClearPin(e.target.value.replace(/[^0-9]/g, ''))}
+                      disabled={clearLoading}
+                      placeholder="940494"
+                      autoComplete="off"
+                      className="form-input font-mono"
+                      style={{
+                        height: '46px',
+                        fontSize: '20px',
+                        letterSpacing: '8px',
+                        textAlign: 'center',
+                        fontWeight: 800,
+                        borderColor: clearPin.length === 6 && clearPin !== '940494' ? 'var(--rose-primary)' : undefined
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPin(!showPin)}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--text-muted)'
+                      }}
+                      tabIndex={-1}
+                    >
+                      {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    {lang === 'ta'
+                      ? 'அங்கீகாரத்திற்கு 6-இலக்க பாதுகாப்பு பின்னை (940494) உள்ளிடவும்.'
+                      : 'Enter the 6-digit master security PIN (940494) to authenticate.'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowClearModal(false)}
+                  disabled={clearLoading}
+                  className="btn btn-secondary btn-sm"
+                  style={{ height: '38px' }}
+                >
+                  {t('btn_cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={clearLoading || !clearConfirmed || clearPin.length !== 6}
+                  className="btn btn-secondary btn-sm"
+                  style={{
+                    height: '38px',
+                    fontWeight: 750,
+                    background: (!clearConfirmed || clearPin.length !== 6) ? undefined : 'var(--rose-primary)',
+                    color: (!clearConfirmed || clearPin.length !== 6) ? 'var(--text-muted)' : '#ffffff',
+                    borderColor: 'var(--rose-border)',
+                    cursor: (!clearConfirmed || clearPin.length !== 6 || clearLoading) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <Trash2 size={16} />
+                  <span>{clearLoading ? (lang === 'ta' ? 'அழிக்கப்படுகிறது...' : 'Purging...') : (lang === 'ta' ? 'நிரந்தரமாக அழி & கேச் நீக்கு' : 'Permanently Clear & Purge Cache')}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

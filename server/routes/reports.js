@@ -78,15 +78,26 @@ router.get('/dashboard', async (req, res) => {
            FROM closed_clients WHERE company_id = ?`,
           [companyId]
         ),
-        // 6. Defaulter Radar: Clients with high remaining balance
+        // 6. Defaulter Radar: Clients with high remaining balance (Optimized JOIN)
         safeQuery(
           `SELECT c.id, c.sl_no, c.name, c.phone, c.address, lc.principal, lc.start_date, lc.month_year,
-                  COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id), 0) as total_collected,
-                  COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id AND collection_date = ?), 0) as paid_today
+                  COALESCE(coll.total_collected, 0) as total_collected,
+                  COALESCE(today_coll.paid_today, 0) as paid_today
            FROM loan_cycles lc
            JOIN clients c ON c.id = lc.client_id
+           LEFT JOIN (
+             SELECT cycle_id, SUM(amount) as total_collected
+             FROM daily_collections
+             GROUP BY cycle_id
+           ) coll ON coll.cycle_id = lc.id
+           LEFT JOIN (
+             SELECT cycle_id, SUM(amount) as paid_today
+             FROM daily_collections
+             WHERE collection_date = ?
+             GROUP BY cycle_id
+           ) today_coll ON today_coll.cycle_id = lc.id
            WHERE lc.company_id = ? AND lc.month_year = ? AND c.status != 'deleted' AND lc.status != 'archived'
-           ORDER BY (lc.principal - COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id), 0)) DESC
+           ORDER BY (lc.principal - COALESCE(coll.total_collected, 0)) DESC
            LIMIT 10`,
           [today, companyId, month_year]
         ),

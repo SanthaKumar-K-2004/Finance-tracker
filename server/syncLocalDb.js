@@ -32,7 +32,16 @@ export async function syncCloudToLocal() {
 
   console.log(`📥 Fetched from Turso: ${clients.length} clients, ${cycles.length} cycles, ${collections.length} collections.`);
 
-  // 3. Upsert into local database
+  // 3. Clear local tables to prevent ghost rows from deleted cloud records
+  localDb.exec(`
+    DELETE FROM daily_collections;
+    DELETE FROM loan_cycles;
+    DELETE FROM clients;
+    DELETE FROM closed_clients;
+    DELETE FROM settlements;
+  `);
+
+  // 4. Upsert into local database
   // Companies
   for (const c of companies) {
     const stmt = localDb.prepare(

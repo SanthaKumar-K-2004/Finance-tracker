@@ -26,10 +26,12 @@ import {
   X,
   ShieldCheck,
   Download,
-  Plus
+  Plus,
+  Search
 } from 'lucide-react';
 import CashDenominationModal from './CashDenominationModal';
 import MonthYearPicker from './MonthYearPicker';
+import SpotlightSearchModal from './SpotlightSearchModal';
 import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
 export default function Layout({ children, viewMode, setViewMode, activeMonth, setActiveMonth, monthsList, refreshData }) {
@@ -38,14 +40,36 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
   const { company } = useCompany();
   const [showCashCounter, setShowCashCounter] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
+  const [showSpotlight, setShowSpotlight] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { isOnline, pendingCount, isSyncing, triggerSync } = useNetworkStatus(refreshData);
 
-  // Close mobile more sheet on navigation
+  // Global shortcut: Ctrl+K / Cmd+K for Super-Spotlight Search
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowSpotlight((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Close mobile more sheet on navigation or Escape key
   useEffect(() => {
     setShowMobileMore(false);
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!showMobileMore) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setShowMobileMore(false);
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [showMobileMore]);
 
   return (
     <div className="app-layout">
@@ -62,6 +86,10 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
                 src={company.logo_url}
                 alt={company.name || 'Shop Logo'}
                 className="brand-logo-img"
+                width="44"
+                height="44"
+                loading="eager"
+                fetchpriority="high"
                 onError={(e) => {
                   e.target.style.display = 'none';
                   const fallback = e.target.parentElement?.querySelector('.brand-logo-fallback');
@@ -96,6 +124,33 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
 
         {/* Desktop Controls (hidden on mobile) */}
         <div className="top-controls desktop-only">
+          {/* Universal Super-Spotlight Fast Search (Ctrl+K) */}
+          <button
+            type="button"
+            onClick={() => setShowSpotlight(true)}
+            className="btn btn-secondary btn-sm"
+            style={{
+              height: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '0 12px',
+              background: 'var(--bg-app)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-secondary)'
+            }}
+            title="Super-Spotlight Search (Ctrl+K)"
+            aria-label="Spotlight Search"
+          >
+            <Search size={15} color="var(--indigo-primary)" />
+            <span style={{ fontSize: '12.5px', fontWeight: 600 }}>
+              {lang === 'ta' ? 'தேடுக...' : 'Search...'}
+            </span>
+            <kbd style={{ fontSize: '10px', background: 'var(--bg-surface)', padding: '2px 5px', borderRadius: '4px', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+              Ctrl K
+            </kbd>
+          </button>
+
           {/* Dedicated Enterprise Month/Year Picker & Navigator */}
           <MonthYearPicker
             activeMonth={activeMonth}
@@ -248,6 +303,17 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
         <div className="top-controls mobile-only" style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
           <button
             type="button"
+            onClick={() => setShowSpotlight(true)}
+            className="btn-icon"
+            style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            title={lang === 'ta' ? 'தேடுக (Ctrl+K)' : 'Search (Ctrl+K)'}
+            aria-label="Spotlight Search"
+          >
+            <Search size={16} color="var(--indigo-primary)" />
+          </button>
+
+          <button
+            type="button"
             onClick={() => setShowCashCounter(true)}
             className="btn-icon"
             style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -332,8 +398,11 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
           <button
             type="button"
             onClick={triggerSync}
+            disabled={isSyncing}
             className="badge badge-amber"
             style={{ fontSize: '10px', padding: '2px 6px', border: 'none', cursor: 'pointer' }}
+            title={lang === 'ta' ? 'கிளவுடில் ஒத்திசைக்க கிளிக் செய்க' : 'Click to sync offline changes'}
+            aria-label={lang === 'ta' ? 'கிளவுடில் ஒத்திசைக்க கிளிக் செய்க' : 'Click to sync offline changes'}
           >
             <RefreshCw size={11} className={isSyncing ? 'spin-animate' : ''} />
             <span>{pendingCount}</span>
@@ -391,25 +460,25 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
 
       {/* Mobile Fixed Bottom Navigation Bar */}
       <nav className="mobile-bottom-nav mobile-only" aria-label="Mobile Navigation">
-        <NavLink 
-          to="/" 
-          end 
+        <NavLink
+          to="/"
+          end
           className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}
         >
           <Table size={20} />
           <span>{lang === 'ta' ? 'வசூல்' : 'Ledger'}</span>
         </NavLink>
 
-        <NavLink 
-          to="/dashboard" 
+        <NavLink
+          to="/dashboard"
           className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}
         >
           <LayoutDashboard size={20} />
           <span>{lang === 'ta' ? 'முகப்பு' : 'Dashboard'}</span>
         </NavLink>
 
-        <NavLink 
-          to="/clients" 
+        <NavLink
+          to="/clients"
           className={({ isActive }) => `mobile-nav-item ${isActive ? 'active' : ''}`}
         >
           <Users size={20} />
@@ -440,9 +509,15 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
       {/* Mobile Slide-Up More Menu Overlay & Drawer */}
       {showMobileMore && (
         <div className="mobile-more-overlay" onClick={() => setShowMobileMore(false)}>
-          <div className="mobile-more-sheet" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="mobile-more-sheet"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={lang === 'ta' ? 'கூடுதல் வசதிகள் & அமைப்புகள்' : 'More Features & Settings'}
+          >
             <div className="mobile-sheet-drag-handle" />
-            
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <h3 style={{ fontSize: '15px', fontWeight: 800, margin: 0 }}>
                 {lang === 'ta' ? 'கூடுதல் வசதிகள் & அமைப்புகள்' : 'More Features & Settings'}
@@ -459,8 +534,8 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
             </div>
 
             <div className="mobile-more-grid">
-              <NavLink 
-                to="/closed" 
+              <NavLink
+                to="/closed"
                 className="mobile-more-card"
                 onClick={() => setShowMobileMore(false)}
               >
@@ -470,8 +545,8 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
                 <span>{lang === 'ta' ? 'நிறைவுற்ற தவணைகள்' : 'Closed Thavanai'}</span>
               </NavLink>
 
-              <NavLink 
-                to="/excel" 
+              <NavLink
+                to="/excel"
                 className="mobile-more-card"
                 onClick={() => setShowMobileMore(false)}
               >
@@ -481,8 +556,8 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
                 <span>{lang === 'ta' ? 'எக்செல் மேலாண்மை' : 'Excel Hub'}</span>
               </NavLink>
 
-              <NavLink 
-                to="/settings" 
+              <NavLink
+                to="/settings"
                 className="mobile-more-card"
                 onClick={() => setShowMobileMore(false)}
               >
@@ -524,6 +599,12 @@ export default function Layout({ children, viewMode, setViewMode, activeMonth, s
       {showCashCounter && (
         <CashDenominationModal onClose={() => setShowCashCounter(false)} />
       )}
+
+      {/* Super-Spotlight Universal Search Modal */}
+      <SpotlightSearchModal
+        isOpen={showSpotlight}
+        onClose={() => setShowSpotlight(false)}
+      />
     </div>
   );
 }

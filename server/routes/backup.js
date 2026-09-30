@@ -226,14 +226,133 @@ router.get('/status', async (req, res) => {
   }
 });
 
-// POST clean database slate (Wipes test borrowers & records for fresh production start)
+// Master Security PIN required for permanent database clearance & server cache purge
+const MASTER_SECURITY_PIN = '940494';
+
+// POST clear all data & purge server cache (Double Verified with Master Security PIN 940494)
+router.post('/clear-all-data', async (req, res) => {
+  try {
+    const { pin, confirmation } = req.body;
+
+    // 1. Double verify confirmation token
+    if (confirmation !== 'CONFIRM_CLEAR_ALL_DATA') {
+      return res.status(400).json({
+        success: false,
+        error: 'Double confirmation token required. Pass { confirmation: "CONFIRM_CLEAR_ALL_DATA" }'
+      });
+    }
+
+    // 2. Master Security PIN verification (Must match 940494)
+    if (!pin || String(pin).trim() !== MASTER_SECURITY_PIN) {
+      return res.status(403).json({
+        success: false,
+        error: 'Invalid Security PIN. Clearance denied (தவறான பாதுகாப்பு பின்). Master PIN is required.'
+      });
+    }
+
+    // 3. Automated safety backup before destructive purge
+    const companyId = 'comp_alr_001';
+    try {
+      const [companies, clients, loan_cycles, daily_collections, closed_clients, settings, settlements, whatsapp_logs] = await Promise.all([
+        query('SELECT * FROM companies'),
+        query("SELECT * FROM clients WHERE status != 'deleted'"),
+        query('SELECT * FROM loan_cycles'),
+        query('SELECT * FROM daily_collections'),
+        query('SELECT * FROM closed_clients'),
+        query('SELECT * FROM settings'),
+        query('SELECT * FROM settlements'),
+        query('SELECT * FROM whatsapp_logs')
+      ]);
+
+      const backupData = {
+        version: '1.0.0',
+        exported_at: new Date().toISOString(),
+        database_mode: process.env.DATABASE_MODE || 'turso',
+        metadata: {
+          reason: 'Automated safety snapshot prior to master data clearance',
+          company_id: companyId
+        },
+        tables: {
+          companies,
+          clients,
+          loan_cycles,
+          daily_collections,
+          closed_clients,
+          settings,
+          settlements,
+          whatsapp_logs
+        }
+      };
+
+      const backupDir = process.env.VERCEL ? path.resolve('/tmp', 'data') : path.resolve('data');
+      if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
+      }
+      const safetyBackupPath = path.resolve(backupDir, `finance_backup_${Date.now()}.json`);
+      fs.writeFileSync(safetyBackupPath, JSON.stringify(backupData, null, 2));
+    } catch (bErr) {
+      console.warn('Safety backup warning prior to wipe:', bErr.message);
+    }
+
+    // 4. Child-first foreign-key deletions
+    await execute('DELETE FROM daily_collections;');
+    await execute('DELETE FROM loan_cycles;');
+    await execute('DELETE FROM clients;');
+    await execute('DELETE FROM closed_clients;');
+    await execute('DELETE FROM settlements;');
+    await execute('DELETE FROM whatsapp_logs;');
+
+    // Clean test companies/lines/staff, preserving primary company comp_alr_001
+    try {
+      await execute("DELETE FROM staff_agents WHERE company_id != 'comp_alr_001';");
+      await execute("DELETE FROM lines WHERE company_id != 'comp_alr_001';");
+      await execute("DELETE FROM companies WHERE id != 'comp_alr_001';");
+    } catch (_) {}
+
+    // Ensure canonical primary company comp_alr_001 exists
+    await execute(`
+      INSERT OR IGNORE INTO companies (id, name, tagline, phone, address, default_language)
+      VALUES ('comp_alr_001', 'ALR Finance (ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ்)', 'ஸ்ரீ லக்ஷ்மி ஃபைனான்ஸ் • அலங்காநல்லூர்', '9585194934', 'அலங்காநல்லூர், மதுரை (Alanganallur, Madurai)', 'ta')
+    `);
+
+    // 5. Server-side Clear Cache All: Invalidate all in-memory fast caches
+    serverCache.clear();
+
+    // 6. Synchronize local SQLite replica if in Turso Cloud mode
+    try {
+      if (process.env.DATABASE_MODE === 'turso' && process.env.TURSO_DATABASE_URL) {
+        const { syncCloudToLocal } = await import('../syncLocalDb.js');
+        await syncCloudToLocal();
+      }
+    } catch (syncErr) {
+      console.warn('Local DB sync warning after data clearance:', syncErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'All client records, loan cycles, collections, and server-side caches cleared successfully. Canonical company comp_alr_001 preserved.',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// POST clean database slate (Legacy route protected with PIN 940494 or confirmation)
 router.post('/clean-slate', async (req, res) => {
   try {
-    const { confirmation } = req.body;
+    const { confirmation, pin } = req.body;
     if (confirmation !== 'CONFIRM_CLEAN_SLATE') {
       return res.status(400).json({
         success: false,
         error: 'Confirmation required. Pass { confirmation: "CONFIRM_CLEAN_SLATE" }'
+      });
+    }
+
+    if (pin && String(pin).trim() !== MASTER_SECURITY_PIN) {
+      return res.status(403).json({
+        success: false,
+        error: 'Invalid Security PIN. Clearance denied.'
       });
     }
 

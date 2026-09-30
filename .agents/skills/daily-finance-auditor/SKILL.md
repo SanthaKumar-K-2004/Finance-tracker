@@ -63,3 +63,19 @@ Zero-cost receipt messages must be formatted as:
 ```
 URL Encoding:
 `https://wa.me/91[Phone]?text=[EncodedMessage]`
+
+---
+
+## ⚡ 4. High-Concurrency Write Architecture & Ledger Integrity
+- **Write Queuing**: To handle high concurrency across dozens of field agents, route writes through `writeQueue.enqueue()` or `executeQueued()` and `batchQueued()`.
+- **Idempotency Protection**: Enforce `X-Idempotency-Key` headers on state-changing collection and disbursement endpoints to protect field collections from duplicate network retries.
+- **Grouped Aggregations**: Query total collections using `LEFT JOIN (SELECT cycle_id, SUM(amount) FROM daily_collections GROUP BY cycle_id)` instead of correlated subquery loops.
+
+---
+
+## ☁️ 5. Enterprise BigQuery Data Transfer Service (DTS) Integration
+For scaling beyond local registers to enterprise data warehousing:
+1. **Partitioning**: Partition the `daily_collections` table by `collection_date` (`DAY` partitioning).
+2. **Clustering**: Cluster `daily_collections` by `(cycle_id, client_id)` and `clients` by `(company_id, status)`.
+3. **Format**: Stream records as newline-delimited JSON (`.jsonl`) files.
+4. **Declarative Pipeline**: Generate declarative `deployment.yaml` with source `google_cloud_storage` and destination dataset `daily_finance_dw`.

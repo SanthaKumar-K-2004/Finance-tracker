@@ -1,32 +1,42 @@
 /* ==========================================================================
-   ALR Finance Design System — Modern Enterprise Microfinance Suite
-   Tamil Nadu Daily Collection & Recovery Management
+   ALR Finance Design System — Enterprise Microfinance Suite
+   Tamil Nadu Daily Collection & Ledger Management
+   UI/UX Pro Max: Minimalism & Swiss Style / Banking Trust Palette
    ========================================================================== */
 
 :root {
-  /* Font Families — UI/UX Pro Max Enterprise Typography */
+  /* Font Families — Corporate Trust Typography */
   --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-heading: 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif;
   --font-tamil: 'Noto Sans Tamil', 'Mukta Malar', 'Plus Jakarta Sans', 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
+  /* Spacing Scale (Dense Dashboard 8/10) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
   /* Base Light Theme (Daylight / Sun-readable) */
   --bg-app: #F8FAFC;
   --bg-surface: #FFFFFF;
   --bg-surface-hover: #F1F5F9;
-  --bg-surface-active: #E2E8F0;
+  --bg-surface-active: #E8EDF3;
   --bg-input: #FFFFFF;
   
   --border-subtle: #E2E8F0;
   --border-strong: #CBD5E1;
-  --border-focus: #059669;
+  --border-focus: #0F766E;
 
   --text-primary: #0F172A;
   --text-secondary: #475569;
   --text-muted: #94A3B8;
   --text-inverse: #FFFFFF;
 
-  /* Functional Accents */
+  /* Functional Accents — Semantic Only */
   --emerald-primary: #059669;
   --emerald-light: #ECFDF5;
   --emerald-border: #A7F3D0;
@@ -42,39 +52,41 @@
   --rose-border: #FECACA;
   --rose-text: #991B1B;
 
-  --indigo-primary: #4F46E5;
-  --indigo-light: #EEF2FF;
-  --indigo-border: #C7D2FE;
-  --indigo-text: #3730A3;
+  /* Brand Accent — Deep Teal (Trust + Financial Authority) */
+  --indigo-primary: #0F766E;
+  --indigo-light: #F0FDFA;
+  --indigo-border: #99F6E4;
+  --indigo-text: #115E59;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  /* Shadows — Subtle Elevation */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 2px 8px -2px rgba(0, 0, 0, 0.08), 0 1px 3px -1px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 24px -4px rgba(0, 0, 0, 0.08), 0 2px 8px -2px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 16px 40px -8px rgba(0, 0, 0, 0.12), 0 4px 12px -4px rgba(0, 0, 0, 0.05);
 
+  /* Border Radius — Professional Soft */
   --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
   --radius-full: 9999px;
 
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 200ms cubic-bezier(0.4, 0, 0.2, 1);
 
   /* Dynamic UI & Font Scale Design Tokens (A- / 100% / A+) */
-  --ui-font-base: 15.5px;
+  --ui-font-base: 15px;
   --cell-height: 40px;
-  --cell-font-size: 14.5px;
-  --client-title-size: 16px;
+  --cell-font-size: 14px;
+  --client-title-size: 15px;
   --client-meta-size: 12.5px;
-  --principal-size: 16px;
+  --principal-size: 15px;
   --daily-size: 12.5px;
   --col-sticky-1-width: 64px;
   --col-sticky-2-width: 240px;
   --col-sticky-3-width: 130px;
-  --card-title-size: 18px;
-  --card-amount-num-size: 17px;
+  --card-title-size: 17px;
+  --card-amount-num-size: 16px;
 }
 
 [data-ui-scale='large'] {
@@ -109,45 +121,46 @@
 
 /* Dark Mode Theme (Night Work 6PM-6AM / Desk View) */
 [data-theme='dark'] {
-  --bg-app: #090D16;
-  --bg-surface: #131B2E;
-  --bg-surface-hover: #1E293B;
-  --bg-surface-active: #2D3A54;
-  --bg-input: #101726;
+  --bg-app: #0C1222;
+  --bg-surface: #15202E;
+  --bg-surface-hover: #1C2A3A;
+  --bg-surface-active: #253545;
+  --bg-input: #131D2B;
 
-  --border-subtle: #202B42;
-  --border-strong: #334155;
-  --border-focus: #10B981;
+  --border-subtle: #1E2D3D;
+  --border-strong: #2D3F52;
+  --border-focus: #14B8A6;
 
-  --text-primary: #F8FAFC;
+  --text-primary: #F1F5F9;
   --text-secondary: #94A3B8;
   --text-muted: #64748B;
   --text-inverse: #0F172A;
 
   --emerald-primary: #10B981;
-  --emerald-light: rgba(16, 185, 129, 0.12);
-  --emerald-border: rgba(16, 185, 129, 0.3);
+  --emerald-light: rgba(16, 185, 129, 0.1);
+  --emerald-border: rgba(16, 185, 129, 0.25);
   --emerald-text: #34D399;
 
   --amber-primary: #F59E0B;
-  --amber-light: rgba(245, 158, 11, 0.12);
-  --amber-border: rgba(245, 158, 11, 0.3);
+  --amber-light: rgba(245, 158, 11, 0.1);
+  --amber-border: rgba(245, 158, 11, 0.25);
   --amber-text: #FBBF24;
 
   --rose-primary: #EF4444;
-  --rose-light: rgba(239, 68, 68, 0.12);
-  --rose-border: rgba(239, 68, 68, 0.3);
+  --rose-light: rgba(239, 68, 68, 0.1);
+  --rose-border: rgba(239, 68, 68, 0.25);
   --rose-text: #F87171;
 
-  --indigo-primary: #6366F1;
-  --indigo-light: rgba(99, 102, 241, 0.12);
-  --indigo-border: rgba(99, 102, 241, 0.3);
-  --indigo-text: #818CF8;
+  /* Brand Accent — Bright Teal for Dark BG */
+  --indigo-primary: #14B8A6;
+  --indigo-light: rgba(20, 184, 166, 0.1);
+  --indigo-border: rgba(20, 184, 166, 0.25);
+  --indigo-text: #5EEAD4;
 
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.7);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 8px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px -4px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 16px 40px -8px rgba(0, 0, 0, 0.6);
 }
 
 /* Sunlight High-Contrast Mode (Outdoor Field Collection under Bright Sun) */
@@ -182,10 +195,10 @@
   --rose-border: #B91C1C;
   --rose-text: #7F1D1D;
 
-  --indigo-primary: #3730A3;
-  --indigo-light: #EEF2FF;
-  --indigo-border: #3730A3;
-  --indigo-text: #1E1B4B;
+  --indigo-primary: #0F766E;
+  --indigo-light: #CCFBF1;
+  --indigo-border: #0F766E;
+  --indigo-text: #134E4A;
 
   --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
@@ -708,12 +721,19 @@ html, body {
 }
 
 .btn-icon {
-  padding: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 8px;
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   cursor: pointer;
+  touch-action: manipulation;
+  transition: all var(--transition-fast);
 }
 .btn-icon:hover {
   color: var(--text-primary);
@@ -2474,6 +2494,7 @@ html[lang='ta'] .ledger-table th {
     justify-content: center;
     gap: 3px;
     padding: 5px 8px;
+    min-height: 48px;
     border-radius: var(--radius-md);
     color: var(--text-secondary);
     text-decoration: none;

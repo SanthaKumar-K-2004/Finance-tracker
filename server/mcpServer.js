@@ -157,7 +157,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     if (name === 'get_ledger_audit') {
-      const monthYear = args.month_year || '2026-05';
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      const monthYear = args.month_year || currentMonth;
       const cycles = db.prepare(
         `SELECT lc.id, lc.principal, c.name, c.sl_no,
                 COALESCE((SELECT SUM(amount) FROM daily_collections WHERE cycle_id = lc.id), 0) as collected

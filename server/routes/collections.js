@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { query, execute, batch } from '../db.js';
+import { query, execute, batch, executeQueued, batchQueued } from '../db.js';
 import crypto from 'crypto';
 import { serverCache } from '../utils/cache.js';
 import { parseCurrencyNumber } from '../utils/currency.js';
@@ -7,14 +7,31 @@ import { sanitizeMonthYear, getDaysInMonth } from '../utils/date.js';
 
 const router = Router();
 
-// GET 31-Day Ledger Grid
+// GET 31-Day Ledger Grid (Supports server-side search and caching)
 router.get(['/', '/grid'], async (req, res) => {
   try {
     const month_year = sanitizeMonthYear(req.query.month_year);
-    const cacheKey = `grid_${month_year}`;
+    const search = (req.query.search || '').trim();
+    const cacheKey = search ? `grid_${month_year}_${search.toLowerCase()}` : `grid_${month_year}`;
 
     const payload = await serverCache.getOrFetch(cacheKey, async () => {
       const companyId = 'comp_alr_001';
+
+      // Build search condition if search is provided
+      let searchFilter = '';
+      const cycleParams = [companyId, month_year];
+      if (search) {
+        const isNum = !isNaN(Number(search));
+        if (isNum) {
+          searchFilter = 'AND (c.name LIKE ? OR c.phone LIKE ? OR c.client_code LIKE ? OR c.address LIKE ? OR c.sl_no = ?)';
+          const term = `%${search}%`;
+          cycleParams.push(term, term, term, term, parseInt(search, 10));
+        } else {
+          searchFilter = 'AND (c.name LIKE ? OR c.phone LIKE ? OR c.client_code LIKE ? OR c.address LIKE ?)';
+          const term = `%${search}%`;
+          cycleParams.push(term, term, term, term);
+        }
+      }
 
       // 1 & 2. Fetch active cycles and collections for this month in parallel
       const [cycles, collections] = await Promise.all([
@@ -36,8 +53,9 @@ router.get(['/', '/grid'], async (req, res) => {
            FROM loan_cycles lc
            JOIN clients c ON c.id = lc.client_id
            WHERE lc.company_id = ? AND lc.month_year = ? AND c.status != 'deleted' AND lc.status != 'archived'
+           ${searchFilter}
            ORDER BY c.sl_no ASC`,
-          [companyId, month_year]
+          cycleParams
         ),
         query(
           `SELECT dc.cycle_id,
@@ -175,7 +193,7 @@ router.post(['/', '/entry'], async (req, res) => {
       return res.status(404).json({ success: false, error: 'Loan cycle not found' });
     }
 
-    const monthYear = cycleResult[0]?.month_year || '2026-05';
+    const monthYear = sanitizeMonthYear(cycleResult[0]?.month_year);
     const resolvedClientId = client_id || cycleResult[0]?.client_id || null;
 
     // Validate month day boundaries (e.g. Feb 28 days, Apr 30 days)
@@ -195,7 +213,7 @@ router.post(['/', '/entry'], async (req, res) => {
     const collectionDate = `${monthYear}-${dayPadded}`;
     const id = `coll_${cycle_id}_d${day}`;
 
-    await execute(
+    await executeQueued(
       `INSERT INTO daily_collections (id, company_id, cycle_id, client_id, day_number, collection_date, amount, payment_mode, collected_by, notes)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(cycle_id, day_number) 
@@ -258,7 +276,7 @@ router.post('/batch', async (req, res) => {
       if (!cycle_id || !cycleMap[cycle_id]) continue;
 
       const cycle = cycleMap[cycle_id];
-      const monthYear = cycle.month_year || '2026-05';
+      const monthYear = sanitizeMonthYear(cycle.month_year);
       const [yStr, mStr] = monthYear.split('-');
       const yNum = parseInt(yStr, 10);
       const mNum = parseInt(mStr, 10);
@@ -287,7 +305,7 @@ router.post('/batch', async (req, res) => {
     }
 
     if (statements.length > 0) {
-      await batch(statements);
+      await batchQueued(statements);
       serverCache.invalidateTag('grid');
       serverCache.invalidateTag('reports');
     }
@@ -310,7 +328,7 @@ router.delete(['/', '/entry'], async (req, res) => {
       return res.status(400).json({ success: false, error: 'cycle_id and day_number are required' });
     }
     const day = parseInt(day_number, 10);
-    await execute('DELETE FROM daily_collections WHERE cycle_id = ? AND day_number = ?', [cycle_id, day]);
+    await executeQueued('DELETE FROM daily_collections WHERE cycle_id = ? AND day_number = ?', [cycle_id, day]);
     serverCache.invalidateTag('grid');
     serverCache.invalidateTag('reports');
     res.json({ success: true, message: `Entry for day ${day} deleted successfully` });
@@ -352,16 +370,22 @@ router.post('/close-client', async (req, res) => {
       closed_at: new Date().toISOString()
     });
 
-    // Archive to closed_clients
-    await execute(
-      `INSERT INTO closed_clients (id, company_id, client_id, cycle_id, client_name, phone, final_principal, total_collected, excess_amount, closed_date, closure_reason, snapshot_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [archiveId, companyId, client_id, cycle_id, c.name, c.phone, c.principal, totalCollected, excess, today, reason, snapshot]
-    );
-
-    // Update cycle and client status
-    await execute(`UPDATE loan_cycles SET status = 'closed', close_date = ? WHERE id = ?`, [today, cycle_id]);
-    await execute(`UPDATE clients SET status = 'closed' WHERE id = ?`, [client_id]);
+    // Archive to closed_clients and update statuses atomically
+    await batchQueued([
+      {
+        sql: `INSERT INTO closed_clients (id, company_id, client_id, cycle_id, client_name, phone, final_principal, total_collected, excess_amount, closed_date, closure_reason, snapshot_json)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [archiveId, companyId, client_id, cycle_id, c.name, c.phone, c.principal, totalCollected, excess, today, reason, snapshot]
+      },
+      {
+        sql: `UPDATE loan_cycles SET status = 'closed', close_date = ? WHERE id = ?`,
+        args: [today, cycle_id]
+      },
+      {
+        sql: `UPDATE clients SET status = 'closed' WHERE id = ?`,
+        args: [client_id]
+      }
+    ]);
 
     serverCache.invalidateTag('grid');
     serverCache.invalidateTag('reports');
@@ -384,13 +408,17 @@ router.post('/reopen-client', async (req, res) => {
       return res.status(400).json({ success: false, error: 'closed_id is required' });
     }
 
-    await execute('DELETE FROM closed_clients WHERE id = ?', [closed_id]);
+    const stmts = [
+      { sql: 'DELETE FROM closed_clients WHERE id = ?', args: [closed_id] }
+    ];
     if (cycle_id) {
-      await execute("UPDATE loan_cycles SET status = 'active', close_date = NULL WHERE id = ?", [cycle_id]);
+      stmts.push({ sql: "UPDATE loan_cycles SET status = 'active', close_date = NULL WHERE id = ?", args: [cycle_id] });
     }
     if (client_id) {
-      await execute("UPDATE clients SET status = 'active' WHERE id = ?", [client_id]);
+      stmts.push({ sql: "UPDATE clients SET status = 'active' WHERE id = ?", args: [client_id] });
     }
+
+    await batchQueued(stmts);
 
     serverCache.invalidateTag('grid');
     serverCache.invalidateTag('reports');
@@ -412,21 +440,19 @@ router.post('/reset-client', async (req, res) => {
       return res.status(400).json({ success: false, error: 'cycle_id is required' });
     }
 
-    // 1. Delete all daily collections recorded for this cycle
-    await execute('DELETE FROM daily_collections WHERE cycle_id = ?', [cycle_id]);
+    const stmts = [
+      { sql: 'DELETE FROM daily_collections WHERE cycle_id = ?', args: [cycle_id] },
+      { sql: "UPDATE loan_cycles SET status = 'active', close_date = NULL WHERE id = ?", args: [cycle_id] },
+      { sql: 'DELETE FROM closed_clients WHERE cycle_id = ?', args: [cycle_id] }
+    ];
 
-    // 2. If the cycle was marked closed, restore it back to active
-    await execute("UPDATE loan_cycles SET status = 'active', close_date = NULL WHERE id = ?", [cycle_id]);
-
-    // 3. Remove from closed_clients archive if it was archived
-    await execute('DELETE FROM closed_clients WHERE cycle_id = ?', [cycle_id]);
-
-    // 4. Ensure client is active
     if (client_id) {
-      await execute("UPDATE clients SET status = 'active' WHERE id = ?", [client_id]);
+      stmts.push({ sql: "UPDATE clients SET status = 'active' WHERE id = ?", args: [client_id] });
     }
 
-    // 5. Invalidate caches
+    await batchQueued(stmts);
+
+    // Invalidate caches
     serverCache.invalidateTag('grid');
     serverCache.invalidateTag('reports');
     serverCache.invalidateTag('clients');
@@ -448,9 +474,11 @@ router.post('/remove-from-month', async (req, res) => {
       return res.status(400).json({ success: false, error: 'cycle_id is required' });
     }
 
-    // Delete collections for this cycle and archive the cycle
-    await execute('DELETE FROM daily_collections WHERE cycle_id = ?', [cycle_id]);
-    await execute("UPDATE loan_cycles SET status = 'archived' WHERE id = ?", [cycle_id]);
+    // Delete collections for this cycle and archive the cycle atomically
+    await batchQueued([
+      { sql: 'DELETE FROM daily_collections WHERE cycle_id = ?', args: [cycle_id] },
+      { sql: "UPDATE loan_cycles SET status = 'archived' WHERE id = ?", args: [cycle_id] }
+    ]);
 
     // Invalidate caches
     serverCache.invalidateTag('grid');
