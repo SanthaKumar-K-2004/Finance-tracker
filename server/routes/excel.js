@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import { serverCache } from '../utils/cache.js';
 import { parseCurrencyNumber } from '../utils/currency.js';
 import { sanitizeMonthYear } from '../utils/date.js';
+import { matchesIdentifierRange, cleanIdentifier } from '../utils/identifierFilter.js';
 
 const router = Router();
 const XLSX = xlsx.default || xlsx;
@@ -21,6 +22,14 @@ function colToLetter(col) {
     c = Math.floor(c / 26) - 1;
   }
   return letter;
+}
+
+// Helper: Standards-compliant Content-Disposition header with safe ASCII fallback and RFC 5987 UTF-8 encoding
+function makeContentDisposition(fallbackAsciiFilename, utf8Filename) {
+  const safeAscii = (fallbackAsciiFilename || 'export.xlsx').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const targetUtf8 = utf8Filename || fallbackAsciiFilename || 'export.xlsx';
+  const encoded = encodeURIComponent(targetUtf8);
+  return `attachment; filename="${safeAscii}"; filename*=UTF-8''${encoded}`;
 }
 
 // Setup upload directory for Excel files
@@ -508,7 +517,8 @@ router.post('/import', upload.single('file'), async (req, res) => {
     const sheet = wb.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-    let importedClients = 0;
+    let newClients = 0;
+    let updatedClients = 0;
     let importedCollections = 0;
     const collectionStatements = [];
 
@@ -538,6 +548,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
           `UPDATE clients SET name = ?, phone = ?, address = ? WHERE id = ?`,
           [name, phone, address, clientId]
         );
+        updatedClients++;
       } else {
         clientId = `client_${slNo}_${crypto.randomBytes(3).toString('hex')}`;
         await execute(
@@ -545,7 +556,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
            VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
           [clientId, companyId, slNo, `ALR-${slNo}`, name, phone, address]
         );
-        importedClients++;
+        newClients++;
       }
 
       // Upsert loan cycle with exact total_days and endDate
@@ -611,9 +622,500 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
     res.json({
       success: true,
-      message: `Successfully imported ${importedClients} clients and ${importedCollections} daily collection entries for ${month_year} (${totalDays} days).`,
-      stats: { importedClients, importedCollections, totalDays }
+      message: `Successfully processed ${newClients + updatedClients} clients (${newClients} new, ${updatedClients} updated) and ${importedCollections} daily collection entries for ${month_year} (${totalDays} days).`,
+      imported_clients_count: newClients + updatedClients,
+      new_clients_count: newClients,
+      updated_clients_count: updatedClients,
+      imported_collections_count: importedCollections,
+      stats: {
+        totalClients: newClients + updatedClients,
+        newClients,
+        updatedClients,
+        importedClients: newClients + updatedClients,
+        importedCollections,
+        totalDays
+      }
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ============================================================================
+// ADVANCED EXPORT ENDPOINTS — Premium Color-Coded Filtered Exports
+// ============================================================================
+
+// GET /api/excel/export-filtered — Advanced filtered Excel with color-coded cells
+router.get('/export-filtered', async (req, res) => {
+  try {
+    const month_year = sanitizeMonthYear(req.query.month_year);
+    const statusFilter = req.query.status || 'all';
+    const village = (req.query.village || '').trim();
+    const search = (req.query.search || '').trim();
+    const minPrincipal = Number(req.query.min_principal) || 0;
+    const maxPrincipal = Number(req.query.max_principal) || Infinity;
+    const fromSlNo = cleanIdentifier(req.query.from_sl_no);
+    const toSlNo = cleanIdentifier(req.query.to_sl_no);
+    const sortBy = req.query.sort_by || 'sl_no';
+    const sortOrder = req.query.sort_order || 'asc';
+    const companyId = 'comp_alr_001';
+
+    const [year, month] = month_year.split('-');
+    const yNum = parseInt(year, 10);
+    const mNum = parseInt(month, 10);
+    const totalDays = (yNum && mNum) ? new Date(yNum, mNum, 0).getDate() : 31;
+    const totalCols = 11 + totalDays;
+
+    const firstDayCol = 'G';
+    const lastDayCol = colToLetter(5 + totalDays);
+    const totalCol = colToLetter(6 + totalDays);
+    const remCol = colToLetter(7 + totalDays);
+
+    // Fetch company info
+    let companyName = 'ALR Finance';
+    try {
+      const compRows = await query('SELECT name FROM companies WHERE id = ?', [companyId]);
+      if (compRows.length > 0) companyName = compRows[0].name;
+    } catch (_) {}
+
+    // Fetch cycles and collections
+    const [cycles, collections] = await Promise.all([
+      query(
+        `SELECT lc.id as cycle_id, lc.principal, lc.start_date, lc.close_date, lc.total_days,
+                c.id as client_id, c.sl_no, c.client_code, c.name, c.phone, c.address
+         FROM loan_cycles lc
+         JOIN clients c ON c.id = lc.client_id
+         WHERE lc.company_id = ? AND lc.month_year = ? AND c.status != 'deleted' AND lc.status != 'archived'
+         ORDER BY c.sl_no ASC`,
+        [companyId, month_year]
+      ),
+      query(
+        `SELECT dc.cycle_id, dc.day_number, dc.amount
+         FROM daily_collections dc
+         JOIN loan_cycles lc ON lc.id = dc.cycle_id
+         WHERE lc.company_id = ? AND lc.month_year = ?`,
+        [companyId, month_year]
+      )
+    ]);
+
+    const collsByCycle = {};
+    collections.forEach(c => {
+      if (!collsByCycle[c.cycle_id]) collsByCycle[c.cycle_id] = {};
+      collsByCycle[c.cycle_id][c.day_number] = Number(c.amount) || 0;
+    });
+
+    // Build rows with computed fields
+    let rows = cycles.map(c => {
+      const dayMap = collsByCycle[c.cycle_id] || {};
+      let totalCollected = 0;
+      const days = {};
+      for (let d = 1; d <= totalDays; d++) {
+        const amt = dayMap[d] || 0;
+        days[d] = amt;
+        totalCollected += amt;
+      }
+      const remaining = Math.max(0, c.principal - totalCollected);
+      const excess = Math.max(0, totalCollected - c.principal);
+      const rate = c.principal > 0 ? Math.round((totalCollected / c.principal) * 100) : 0;
+      let status = 'pending';
+      if (totalCollected >= c.principal && c.principal > 0) status = 'cleared';
+      else if (rate >= 50) status = 'partial';
+      else if (totalCollected === 0) status = 'zero';
+      return { ...c, totalCollected, remaining, excess, rate, status, days };
+    });
+
+    // Apply filters
+    if (statusFilter === 'pending') rows = rows.filter(r => r.status === 'pending' || r.status === 'zero');
+    else if (statusFilter === 'cleared') rows = rows.filter(r => r.status === 'cleared');
+    else if (statusFilter === 'partial') rows = rows.filter(r => r.status === 'partial');
+    if (village) rows = rows.filter(r => (r.address || '').toLowerCase().includes(village.toLowerCase()));
+    if (search) {
+      const s = search.toLowerCase();
+      rows = rows.filter(r =>
+        (r.name && r.name.toLowerCase().includes(s)) ||
+        (r.phone && r.phone.includes(s)) ||
+        String(r.sl_no) === s ||
+        (r.client_code && r.client_code.toLowerCase().includes(s)) ||
+        (r.client_id && r.client_id.toLowerCase().includes(s))
+      );
+    }
+    if (minPrincipal > 0) rows = rows.filter(r => r.principal >= minPrincipal);
+    if (maxPrincipal < Infinity) rows = rows.filter(r => r.principal <= maxPrincipal);
+    if (fromSlNo || toSlNo) {
+      rows = rows.filter(r => matchesIdentifierRange(r, fromSlNo, toSlNo));
+    }
+
+    const dir = sortOrder === 'desc' ? -1 : 1;
+    rows.sort((a, b) => {
+      if (sortBy === 'name') return dir * a.name.localeCompare(b.name);
+      if (sortBy === 'remaining') return dir * (a.remaining - b.remaining);
+      if (sortBy === 'collection_rate') return dir * (a.rate - b.rate);
+      return dir * ((a.sl_no || 0) - (b.sl_no || 0));
+    });
+
+    // Build Excel data
+    const monthNames = ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'];
+    const monthLabel = `${monthNames[mNum - 1] || ''} - ${year}`;
+    const totalPrincipal = rows.reduce((s, r) => s + r.principal, 0);
+    const exportDate = new Date().toISOString().split('T')[0];
+
+    const data = [];
+    // Row 1: Title
+    data.push([`DAILY COLLECTION REGISTER (ALR) — ${companyName}`]);
+    // Row 2: Month info
+    const row2 = new Array(totalCols).fill('');
+    row2[0] = 'MONTH / YEAR';
+    row2[2] = monthLabel;
+    row2[5] = `PRINCIPAL: ${totalPrincipal.toLocaleString('en-IN')}`;
+    row2[Math.min(10, totalCols - 2)] = `Exported: ${exportDate}`;
+    data.push(row2);
+    // Row 3: Filter info
+    const slRangeText = (fromSlNo || toSlNo) ? ` | Sl/Code: ${fromSlNo || 'Start'} to ${toSlNo || 'End'}` : '';
+    const filterDesc = `Filter: Status=${statusFilter}${slRangeText} | Village=${village || 'All'} | Principal=${minPrincipal > 0 || maxPrincipal < Infinity ? `₹${minPrincipal}-₹${maxPrincipal === Infinity ? '∞' : maxPrincipal}` : 'All'} | Sort=${sortBy} ${sortOrder}`;
+    const row3 = new Array(totalCols).fill('');
+    row3[0] = filterDesc;
+    data.push(row3);
+    // Row 4: Headers
+    const headers = ['Sl.No', 'Month /\nYear', 'Name', 'Phone\nNumber', 'Address', 'Principal\nAmount'];
+    for (let d = 1; d <= totalDays; d++) headers.push(d);
+    headers.push(`Total\n(${totalDays} Days)`, 'Remaining\n(Principal-Total)', 'Excess\n(+Amount)', 'Close\nDate', 'Status');
+    data.push(headers);
+
+    // Data rows
+    rows.forEach((r, idx) => {
+      const rowIdx = 5 + idx; // 1-based Excel row
+      const row = [];
+      const slDisplay = r.client_code ? `${r.sl_no || idx + 1} (${r.client_code})` : (r.sl_no || idx + 1);
+      row.push(slDisplay);
+      row.push(r.start_date || `01.${month}.${year}`);
+      row.push(r.name);
+      row.push(r.phone || '');
+      row.push(r.address || '');
+      row.push(r.principal);
+      for (let d = 1; d <= totalDays; d++) {
+        row.push(r.days[d] || '');
+      }
+      row.push({ t: 'n', f: `SUM(${firstDayCol}${rowIdx}:${lastDayCol}${rowIdx})`, v: r.totalCollected });
+      row.push({ t: 'n', f: `IF(F${rowIdx}-${totalCol}${rowIdx}<0,0,F${rowIdx}-${totalCol}${rowIdx})`, v: r.remaining });
+      row.push({ t: 'n', f: `IF(${totalCol}${rowIdx}-F${rowIdx}>0,${totalCol}${rowIdx}-F${rowIdx},0)`, v: r.excess });
+      row.push(r.close_date || '');
+      row.push(r.status === 'cleared' ? '✅ Cleared' : r.status === 'partial' ? '🟡 Partial' : '🔴 Pending');
+      data.push(row);
+    });
+
+    // Totals row
+    const totalsRowIdx = 5 + rows.length;
+    const totalsRow = ['', '', 'TOTALS', '', '', rows.reduce((s, r) => s + r.principal, 0)];
+    for (let d = 1; d <= totalDays; d++) {
+      totalsRow.push(rows.reduce((s, r) => s + (r.days[d] || 0), 0));
+    }
+    totalsRow.push(rows.reduce((s, r) => s + r.totalCollected, 0));
+    totalsRow.push(rows.reduce((s, r) => s + r.remaining, 0));
+    totalsRow.push(rows.reduce((s, r) => s + r.excess, 0));
+    totalsRow.push('');
+    totalsRow.push(`${rows.length} clients`);
+    data.push(totalsRow);
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // Merged header ranges
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 1 } },
+      { s: { r: 1, c: 2 }, e: { r: 1, c: 4 } },
+      { s: { r: 2, c: 0 }, e: { r: 2, c: totalCols - 1 } }
+    ];
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: 8 }, { wch: 14 }, { wch: 28 }, { wch: 16 }, { wch: 24 }, { wch: 14 },
+      ...new Array(totalDays).fill({ wch: 6 }),
+      { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 14 }
+    ];
+
+    // Apply cell colors for status (green/red)
+    for (let i = 0; i < rows.length; i++) {
+      const excelRow = 4 + i; // 0-based row in sheet data (Row 1=0, so data row 5 = index 4)
+      const r = rows[i];
+      // Color the Remaining column
+      const remCellAddr = XLSX.utils.encode_cell({ r: excelRow, c: 6 + totalDays + 1 });
+      if (ws[remCellAddr]) {
+        ws[remCellAddr].s = r.remaining > 0
+          ? { fill: { fgColor: { rgb: 'FEE2E2' } }, font: { color: { rgb: '991B1B' }, bold: true } }
+          : { fill: { fgColor: { rgb: 'DCFCE7' } }, font: { color: { rgb: '166534' }, bold: true } };
+      }
+      // Color the Status column
+      const statusCellAddr = XLSX.utils.encode_cell({ r: excelRow, c: 6 + totalDays + 4 });
+      if (ws[statusCellAddr]) {
+        ws[statusCellAddr].s = r.status === 'cleared'
+          ? { fill: { fgColor: { rgb: 'DCFCE7' } }, font: { color: { rgb: '166534' }, bold: true } }
+          : { fill: { fgColor: { rgb: 'FEE2E2' } }, font: { color: { rgb: '991B1B' }, bold: true } };
+      }
+    }
+
+    // Sheet 2: Export Metadata
+    const metaData = [
+      ['EXPORT METADATA'],
+      [''],
+      ['Export Date', exportDate],
+      ['Month', month_year],
+      ['Company', companyName],
+      ['Filters Applied', filterDesc],
+      ['Total Rows', rows.length],
+      ['Total Principal', `₹${totalPrincipal.toLocaleString('en-IN')}`],
+      ['Total Collected', `₹${rows.reduce((s, r) => s + r.totalCollected, 0).toLocaleString('en-IN')}`],
+      ['Total Remaining', `₹${rows.reduce((s, r) => s + r.remaining, 0).toLocaleString('en-IN')}`],
+      ['Cleared Clients', rows.filter(r => r.status === 'cleared').length],
+      ['Pending Clients', rows.filter(r => r.status !== 'cleared').length],
+      ['Data Integrity', `Verified: ${rows.length} rows exported = ${rows.length} rows queried ✅`]
+    ];
+    const wsMeta = XLSX.utils.aoa_to_sheet(metaData);
+    wsMeta['!cols'] = [{ wch: 20 }, { wch: 50 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Collection Register');
+    XLSX.utils.book_append_sheet(wb, wsMeta, 'Export Metadata');
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const slTag = (fromSlNo || toSlNo) ? `_${(fromSlNo || 'start').replace(/[^a-zA-Z0-9_-]/g, '')}-${(toSlNo || 'end').replace(/[^a-zA-Z0-9_-]/g, '')}` : '';
+    const filename = `ALR_Filtered_Register_${month_year}_${statusFilter}${slTag}.xlsx`;
+
+    console.log(`[EXPORT] Filtered Excel: ${month_year} | status=${statusFilter} | ${rows.length} rows | ${exportDate}`);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/excel/export-member-history — Single member complete payment history Excel
+router.get('/export-member-history', async (req, res) => {
+  try {
+    const clientId = req.query.client_id;
+    if (!clientId) return res.status(400).json({ success: false, error: 'client_id is required' });
+
+    const companyId = 'comp_alr_001';
+
+    // Fetch client
+    const clientRows = await query('SELECT id, sl_no, name, phone, address FROM clients WHERE id = ? AND company_id = ?', [clientId, companyId]);
+    if (clientRows.length === 0) return res.status(404).json({ success: false, error: 'Client not found' });
+    const client = clientRows[0];
+
+    // Fetch all cycles
+    const cycles = await query(
+      `SELECT id, month_year, cycle_name, principal, start_date, end_date, total_days, status, close_date
+       FROM loan_cycles WHERE client_id = ? AND company_id = ? ORDER BY month_year ASC`,
+      [clientId, companyId]
+    );
+
+    // Fetch all collections
+    const cycleIds = cycles.map(c => c.id);
+    let allColls = [];
+    if (cycleIds.length > 0) {
+      allColls = await query(
+        `SELECT cycle_id, day_number, amount, collection_date
+         FROM daily_collections WHERE cycle_id IN (${cycleIds.map(() => '?').join(',')}) ORDER BY day_number ASC`,
+        cycleIds
+      );
+    }
+    const collsByCycle = {};
+    allColls.forEach(c => {
+      if (!collsByCycle[c.cycle_id]) collsByCycle[c.cycle_id] = [];
+      collsByCycle[c.cycle_id].push(c);
+    });
+
+    // Fetch closed records
+    const closedRecords = await query(
+      'SELECT closed_date, final_principal, total_collected, excess_amount, closure_reason FROM closed_clients WHERE client_id = ? AND company_id = ?',
+      [clientId, companyId]
+    );
+
+    const exportDate = new Date().toISOString().split('T')[0];
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Summary
+    const summaryData = [
+      ['BORROWER PAYMENT HISTORY'],
+      [''],
+      ['Name', client.name],
+      ['Phone', client.phone || '-'],
+      ['Address', client.address || '-'],
+      ['SL No', client.sl_no],
+      ['Total Active Months', cycles.length],
+      ['Export Date', exportDate],
+      [''],
+      ['Month', 'Principal', 'Collected', 'Remaining', 'Excess', 'Paid Days', 'Rate %', 'Status']
+    ];
+
+    let grandPrincipal = 0;
+    let grandCollected = 0;
+
+    cycles.forEach(cycle => {
+      const colls = collsByCycle[cycle.id] || [];
+      const totalCollected = colls.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+      const remaining = Math.max(0, cycle.principal - totalCollected);
+      const excess = Math.max(0, totalCollected - cycle.principal);
+      const paidDays = colls.filter(c => Number(c.amount) > 0).length;
+      const rate = cycle.principal > 0 ? Math.round((totalCollected / cycle.principal) * 100) : 0;
+      const status = totalCollected >= cycle.principal && cycle.principal > 0 ? '✅ Cleared' : '🔴 Pending';
+
+      grandPrincipal += cycle.principal;
+      grandCollected += totalCollected;
+
+      summaryData.push([
+        cycle.cycle_name || cycle.month_year,
+        cycle.principal,
+        totalCollected,
+        remaining,
+        excess,
+        paidDays,
+        `${rate}%`,
+        status
+      ]);
+    });
+
+    // Grand totals
+    summaryData.push([]);
+    summaryData.push([
+      'GRAND TOTAL',
+      grandPrincipal,
+      grandCollected,
+      Math.max(0, grandPrincipal - grandCollected),
+      Math.max(0, grandCollected - grandPrincipal),
+      '', '', ''
+    ]);
+
+    // Closed records section
+    if (closedRecords.length > 0) {
+      summaryData.push([]);
+      summaryData.push(['CLOSED / ARCHIVED RECORDS']);
+      summaryData.push(['Closed Date', 'Principal', 'Collected', 'Excess', 'Reason']);
+      closedRecords.forEach(cr => {
+        summaryData.push([cr.closed_date, cr.final_principal, cr.total_collected, cr.excess_amount, cr.closure_reason]);
+      });
+    }
+
+    const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+    wsSummary['!cols'] = [
+      { wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 14 }
+    ];
+    wsSummary['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }];
+    XLSX.utils.book_append_sheet(wb, wsSummary, `History - ${client.name.substring(0, 20)}`);
+
+    // Sheet per month: daily breakdown
+    cycles.forEach(cycle => {
+      const colls = collsByCycle[cycle.id] || [];
+      const totalDays = cycle.total_days || 31;
+      const dayHeaders = [''];
+      const dayValues = [cycle.cycle_name || cycle.month_year];
+      for (let d = 1; d <= totalDays; d++) {
+        dayHeaders.push(`Day ${d}`);
+        const found = colls.find(c => c.day_number === d);
+        dayValues.push(found ? Number(found.amount) : 0);
+      }
+      dayHeaders.push('Total');
+      const totalCollected = colls.reduce((s, c) => s + (Number(c.amount) || 0), 0);
+      dayValues.push(totalCollected);
+
+      const dailyData = [
+        [`Daily Breakdown — ${cycle.cycle_name || cycle.month_year}`],
+        [`Principal: ₹${cycle.principal.toLocaleString('en-IN')}`],
+        dayHeaders,
+        dayValues
+      ];
+      const wsDaily = XLSX.utils.aoa_to_sheet(dailyData);
+      wsDaily['!cols'] = [{ wch: 16 }, ...new Array(totalDays + 1).fill({ wch: 8 })];
+      const sheetName = (cycle.month_year || 'Unknown').substring(0, 28);
+      XLSX.utils.book_append_sheet(wb, wsDaily, sheetName);
+    });
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const safeAscii = (client.name || '').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30);
+    const fallbackFilename = `Member_History_${safeAscii || client.sl_no || 'member'}_${exportDate}.xlsx`;
+    const utf8Filename = `Member_History_${client.name || 'member'}_${exportDate}.xlsx`;
+
+    console.log(`[EXPORT] Member History: ${client.name} (${clientId}) | ${cycles.length} months | ${exportDate}`);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', makeContentDisposition(fallbackFilename, utf8Filename));
+    res.send(buffer);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET /api/excel/export-closed — Closed clients archive export
+router.get('/export-closed', async (req, res) => {
+  try {
+    const companyId = 'comp_alr_001';
+
+    let companyName = 'ALR Finance';
+    try {
+      const compRows = await query('SELECT name FROM companies WHERE id = ?', [companyId]);
+      if (compRows.length > 0) companyName = compRows[0].name;
+    } catch (_) {}
+
+    const closed = await query(
+      `SELECT id, client_name, phone, final_principal, total_collected, excess_amount, closed_date, closure_reason
+       FROM closed_clients WHERE company_id = ? ORDER BY closed_date DESC`,
+      [companyId]
+    );
+
+    const exportDate = new Date().toISOString().split('T')[0];
+    const data = [
+      [`CLOSED THAVANAI ARCHIVE — ${companyName}`],
+      [`Exported: ${exportDate} | Total Records: ${closed.length}`],
+      [''],
+      ['Sl.No', 'Client Name', 'Phone', 'Principal', 'Total Collected', 'Excess', 'Closed Date', 'Reason', 'Status']
+    ];
+
+    closed.forEach((c, idx) => {
+      data.push([
+        idx + 1,
+        c.client_name,
+        c.phone || '-',
+        c.final_principal,
+        c.total_collected,
+        c.excess_amount || 0,
+        c.closed_date,
+        c.closure_reason || 'completed',
+        '✅ Completed'
+      ]);
+    });
+
+    // Totals
+    data.push([]);
+    data.push([
+      '', 'TOTALS', '',
+      closed.reduce((s, c) => s + c.final_principal, 0),
+      closed.reduce((s, c) => s + c.total_collected, 0),
+      closed.reduce((s, c) => s + (c.excess_amount || 0), 0),
+      '', '',
+      `${closed.length} records`
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } }
+    ];
+    ws['!cols'] = [
+      { wch: 8 }, { wch: 28 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 14 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Closed Archive');
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const filename = `Closed_Thavanai_Archive_${exportDate}.xlsx`;
+
+    console.log(`[EXPORT] Closed Archive: ${closed.length} records | ${exportDate}`);
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import LedgerGrid from '../components/LedgerGrid';
 import ClientCard from '../components/ClientCard';
@@ -7,11 +8,12 @@ import ClientFormModal from '../components/ClientFormModal';
 import ReceiptModal from '../components/ReceiptModal';
 import RolloverWizard from '../components/RolloverWizard';
 import BulkEntryModal from '../components/BulkEntryModal';
-import { Search, Plus, RefreshCw, Filter, Sparkles, Layers, CheckCircle2, ChevronLeft, ChevronRight, RotateCcw, Trash2, X, SlidersHorizontal, AlertTriangle, AlertCircle, ArrowUpDown } from 'lucide-react';
+import { Search, Plus, RefreshCw, Filter, Sparkles, Layers, CheckCircle2, ChevronLeft, ChevronRight, RotateCcw, Trash2, X, SlidersHorizontal, AlertTriangle, AlertCircle, ArrowUpDown, FileSpreadsheet } from 'lucide-react';
 import { getGridCache, saveGridCache, queueOfflinePayment } from '../utils/offlineSync';
 import { playCashRegisterChime, playUndoSound } from '../utils/audioFeedback';
 
 export default function CollectionPage({ activeMonth, viewMode, onDataChanged }) {
+  const navigate = useNavigate();
   const { lang, t } = useLanguage();
   const [gridData, setGridData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -757,6 +759,17 @@ export default function CollectionPage({ activeMonth, viewMode, onDataChanged })
               ⚠️ {lang === 'ta' ? 'சேமிப்பு பிழை' : 'Sync Error'}
             </span>
           )}
+
+          <button
+            type="button"
+            onClick={() => navigate('/excel')}
+            className="btn btn-secondary"
+            style={{ height: '40px', borderColor: 'var(--indigo-primary)', color: 'var(--indigo-primary)', fontWeight: 700 }}
+            title={lang === 'ta' ? 'PDF & எக்செல் ஏற்றுமதி மையம்' : 'PDF & Excel Export Hub'}
+          >
+            <FileSpreadsheet size={16} color="var(--indigo-primary)" />
+            <span className="desktop-only">{lang === 'ta' ? 'ஏற்றுமதி' : 'Export'}</span>
+          </button>
 
           <button
             type="button"

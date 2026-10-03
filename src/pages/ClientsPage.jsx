@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import ClientFormModal from '../components/ClientFormModal';
 import ReceiptModal from '../components/ReceiptModal';
-import { Users, Search, Plus, Phone, MapPin, Edit, Trash2, FileText, MessageSquare, RotateCcw } from 'lucide-react';
+import { Users, Search, Plus, Phone, MapPin, Edit, Trash2, FileText, MessageSquare, RotateCcw, FileSpreadsheet } from 'lucide-react';
 
 export default function ClientsPage({ activeMonth }) {
+  const navigate = useNavigate();
   const { lang, t } = useLanguage();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -131,6 +133,17 @@ export default function ClientsPage({ activeMonth }) {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
+
+          <button
+            type="button"
+            onClick={() => navigate('/excel')}
+            className="btn btn-secondary"
+            style={{ height: '38px', borderColor: 'var(--indigo-primary)', color: 'var(--indigo-primary)', fontWeight: 700, gap: '6px' }}
+            title={lang === 'ta' ? 'PDF & எக்செல் ஏற்றுமதி மையம்' : 'PDF & Excel Export Hub'}
+          >
+            <FileSpreadsheet size={16} />
+            <span className="desktop-only">{lang === 'ta' ? 'ஏற்றுமதி' : 'Export'}</span>
+          </button>
 
           <button
             type="button"

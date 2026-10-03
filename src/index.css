@@ -712,6 +712,20 @@ html, body {
   background: var(--rose-primary);
   color: white;
 }
+.btn-rose:hover {
+  background: #B91C1C;
+}
+
+.btn-emerald {
+  background: #059669;
+  color: white;
+  border: 1px solid #047857;
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.25);
+}
+.btn-emerald:hover {
+  background: #047857;
+  color: white;
+}
 
 .btn-sm {
   padding: 7px 14px;
@@ -1934,6 +1948,23 @@ html, body {
   flex-shrink: 0;
 }
 
+/* Print utility helpers - Hidden on screen, visible only when printing */
+.print-only {
+  display: none !important;
+}
+
+.export-preview-table th {
+  background: #0F172A !important;
+  color: #FFFFFF !important;
+  border-bottom: 2px solid #1E293B !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em;
+}
+
+.export-preview-table thead tr {
+  background: #0F172A !important;
+}
+
 /* ==========================================================================
    Receipt Thermal Slip (@media print for 58mm / 80mm Bluetooth POS Printers)
    ========================================================================== */
@@ -1943,6 +1974,13 @@ html, body {
 }
 
 @media print {
+  .print-only {
+    display: block !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+
   html, body {
     margin: 0 !important;
     padding: 0 !important;
@@ -1954,8 +1992,41 @@ html, body {
     visibility: hidden;
   }
 
-  .receipt-print-area, .receipt-print-area * {
+  .receipt-print-area, .receipt-print-area *,
+  .export-print-area, .export-print-area * {
     visibility: visible;
+  }
+
+  .export-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-family: var(--font-family, system-ui, sans-serif);
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .export-print-area table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+  }
+
+  .export-print-area thead {
+    display: table-header-group;
+  }
+
+  .export-print-area tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .export-print-area th, .export-print-area td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 4px 6px !important;
   }
 
   .receipt-print-area {

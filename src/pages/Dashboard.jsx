@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import { 
   TrendingUp, 
@@ -19,7 +20,8 @@ import {
   DollarSign,
   Activity,
   Check,
-  ChevronRight
+  ChevronRight,
+  FileSpreadsheet
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -37,6 +39,7 @@ import {
 import ReceiptModal from '../components/ReceiptModal';
 
 export default function Dashboard({ activeMonth }) {
+  const navigate = useNavigate();
   const { lang, t } = useLanguage();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -264,6 +267,17 @@ export default function Dashboard({ activeMonth }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => navigate('/excel')}
+            className="btn btn-sm btn-indigo"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            title={lang === 'ta' ? 'அறிக்கைகள் மற்றும் PDF / Excel ஏற்றுமதி மையம்' : 'Reports & PDF / Excel Export Hub'}
+          >
+            <FileSpreadsheet size={14} />
+            <span>{lang === 'ta' ? 'அறிக்கை ஏற்றுமதி' : 'Export Reports'}</span>
+          </button>
+
           <button
             type="button"
             onClick={() => loadDashboard(true)}
