@@ -32,7 +32,8 @@ import {
   FileCheck,
   ArrowUpRight,
   Eye,
-  MapPin
+  MapPin,
+  IndianRupee
 } from 'lucide-react';
 import ExportPreviewTable from '../components/ExportPreviewTable';
 import { downloadRegisterPdf, downloadMemberHistoryPdf } from '../utils/pdfExport';
@@ -87,8 +88,16 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
 
-  // Auto-adopting distinct villages & areas from current previewData
+  // Cached distinct villages for active month (stable options list)
+  const [monthVillages, setMonthVillages] = useState([]);
+
+  useEffect(() => {
+    setMonthVillages([]);
+  }, [selectedMonth]);
+
+  // Auto-adopting distinct villages & areas from current previewData (stable across filter changes)
   const availableVillages = useMemo(() => {
+    if (monthVillages.length > 0) return monthVillages;
     if (Array.isArray(previewData?.villages) && previewData.villages.length > 0) {
       return previewData.villages;
     }
@@ -101,7 +110,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
       return Object.keys(counts).sort((a, b) => a.localeCompare(b)).map(name => ({ name, count: counts[name] }));
     }
     return [];
-  }, [previewData]);
+  }, [monthVillages, previewData?.villages, previewData?.rows]);
 
   // Check if any non-default filter is currently active
   const hasActiveFilters = Boolean(
@@ -160,6 +169,9 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
       const data = await res.json();
       if (data.success) {
         setPreviewData(data);
+        if (Array.isArray(data.villages) && data.villages.length > 0) {
+          setMonthVillages(prev => (prev.length === 0 ? data.villages : prev));
+        }
       } else {
         setPreviewError(data.error || 'Failed to fetch export preview');
       }
@@ -684,9 +696,16 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="input"
-                  style={{ width: '100%', height: '36px', fontSize: '13px', fontWeight: 600 }}
+                  style={{
+                    width: '100%',
+                    height: '38px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    backgroundColor: statusFilter !== 'all' ? 'rgba(16, 185, 129, 0.05)' : undefined,
+                    borderColor: statusFilter !== 'all' ? 'var(--emerald-primary)' : undefined
+                  }}
                 >
-                  <option value="all">{lang === 'ta' ? 'அனைத்தும் (All Borrowers)' : 'All Loans'}</option>
+                  <option value="all">{lang === 'ta' ? '📋 அனைத்து கடன்கள் (All Loans)' : '📋 All Loans'}</option>
                   <option value="pending">{lang === 'ta' ? '🔴 நிலுவை மட்டும் (Pending Only)' : '🔴 Pending Loans Only'}</option>
                   <option value="cleared">{lang === 'ta' ? '✅ முடிந்தது மட்டும் (Cleared Only)' : '✅ Cleared Loans Only'}</option>
                   <option value="partial">{lang === 'ta' ? '🟡 பகுதி வசூல் (Partial Only)' : '🟡 Partial Payments (>=50%)'}</option>
@@ -705,7 +724,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                     value={fromSlNo}
                     onChange={(e) => setFromSlNo(e.target.value)}
                     className="input font-mono"
-                    style={{ width: '50%', height: '36px', fontSize: '13px' }}
+                    style={{ width: '50%', height: '38px', fontSize: '13px' }}
                   />
                   <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 700 }}>-</span>
                   <input
@@ -714,7 +733,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                     value={toSlNo}
                     onChange={(e) => setToSlNo(e.target.value)}
                     className="input font-mono"
-                    style={{ width: '50%', height: '36px', fontSize: '13px' }}
+                    style={{ width: '50%', height: '38px', fontSize: '13px' }}
                   />
                 </div>
               </div>
@@ -726,67 +745,67 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                     <MapPin size={12} style={{ color: 'var(--indigo-primary)' }} />
                     <span>{lang === 'ta' ? 'ஊர் / பகுதி (Village / Area)' : 'Village / Route Area'}</span>
                   </label>
-                  {availableVillages.length > 0 && (
-                    <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--indigo-primary)', background: 'rgba(99, 102, 241, 0.1)', padding: '1px 6px', borderRadius: '4px' }}>
-                      {availableVillages.length} {lang === 'ta' ? 'ஊர்கள்' : 'areas'}
-                    </span>
-                  )}
-                </div>
-                <div style={{ position: 'relative', width: '100%' }}>
-                  <select
-                    value={villageFilter}
-                    onChange={(e) => setVillageFilter(e.target.value)}
-                    className="input"
-                    style={{
-                      width: '100%',
-                      height: '36px',
-                      fontSize: '12.5px',
-                      fontWeight: 600,
-                      paddingRight: villageFilter ? '28px' : '10px',
-                      backgroundColor: villageFilter ? 'rgba(99, 102, 241, 0.05)' : undefined,
-                      borderColor: villageFilter ? 'var(--indigo-primary)' : undefined,
-                      color: 'var(--text-primary)'
-                    }}
-                  >
-                    <option value="">
-                      {lang === 'ta' ? '📍 அனைத்து ஊர்களும் (All Areas)' : '📍 All Villages & Route Areas'}
-                      {previewData?.summary?.total_clients ? ` (${previewData.summary.total_clients})` : ''}
-                    </option>
-                    {availableVillages.map(v => (
-                      <option key={v.name} value={v.name}>
-                        {v.name} ({v.count} {lang === 'ta' ? 'நபர்கள்' : 'clients'})
-                      </option>
-                    ))}
-                    {villageFilter && !availableVillages.some(v => v.name.toLowerCase() === villageFilter.toLowerCase()) && (
-                      <option value={villageFilter}>
-                        "{villageFilter}" ({lang === 'ta' ? 'தேர்ந்தெடுக்கப்பட்டது' : 'Selected'})
-                      </option>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {villageFilter && (
+                      <button
+                        type="button"
+                        onClick={() => setVillageFilter('')}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          fontSize: '10px',
+                          fontWeight: 700,
+                          color: '#DC2626',
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          border: '1px solid rgba(239, 68, 68, 0.25)',
+                          padding: '1px 7px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                        title={lang === 'ta' ? 'ஊர் வடிகட்டியை நீக்கு' : 'Clear village filter'}
+                      >
+                        <X size={11} />
+                        <span>{lang === 'ta' ? 'நீக்கு' : 'Clear'}</span>
+                      </button>
                     )}
-                  </select>
-                  {villageFilter && (
-                    <button
-                      type="button"
-                      onClick={() => setVillageFilter('')}
-                      title={lang === 'ta' ? 'ஊர் வடிகட்டியை நீக்கு' : 'Clear village filter'}
-                      style={{
-                        position: 'absolute',
-                        right: '8px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'var(--text-muted)',
-                        cursor: 'pointer',
-                        padding: '2px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      <X size={14} />
-                    </button>
-                  )}
+                    {availableVillages.length > 0 && (
+                      <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--indigo-primary)', background: 'rgba(99, 102, 241, 0.1)', padding: '1px 6px', borderRadius: '4px' }}>
+                        {availableVillages.length} {lang === 'ta' ? 'ஊர்கள்' : 'areas'}
+                      </span>
+                    )}
+                  </div>
                 </div>
+                <select
+                  value={villageFilter}
+                  onChange={(e) => setVillageFilter(e.target.value)}
+                  className="input"
+                  style={{
+                    width: '100%',
+                    height: '38px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    backgroundColor: villageFilter ? 'rgba(99, 102, 241, 0.06)' : undefined,
+                    borderColor: villageFilter ? 'var(--indigo-primary)' : undefined,
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">
+                    {lang === 'ta' ? '📍 அனைத்து ஊர்களும் (All Areas)' : '📍 All Villages & Route Areas'}
+                  </option>
+                  {availableVillages.map(v => (
+                    <option key={v.name} value={v.name}>
+                      {v.name} ({v.count} {lang === 'ta' ? 'நபர்கள்' : 'clients'})
+                    </option>
+                  ))}
+                  {villageFilter && !availableVillages.some(v => v.name.toLowerCase() === villageFilter.toLowerCase()) && (
+                    <option value={villageFilter}>
+                      "{villageFilter}" ({lang === 'ta' ? 'தேர்ந்தெடுக்கப்பட்டது' : 'Selected'})
+                    </option>
+                  )}
+                </select>
               </div>
 
               {/* Search Borrower */}
@@ -796,11 +815,11 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                 </label>
                 <input
                   type="text"
-                  placeholder={lang === 'ta' ? 'பெயர் அல்லது போன்...' : 'Search borrower or phone...'}
+                  placeholder={lang === 'ta' ? 'பெயர், தொலைபேசி அல்லது குறியீடு...' : 'Search name, phone, or code...'}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="input"
-                  style={{ width: '100%', height: '36px', fontSize: '13px' }}
+                  style={{ width: '100%', height: '38px', fontSize: '13px' }}
                 />
               </div>
 
@@ -816,7 +835,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                     value={minPrincipal}
                     onChange={(e) => setMinPrincipal(e.target.value)}
                     className="input font-mono"
-                    style={{ width: '50%', height: '36px', fontSize: '13px' }}
+                    style={{ width: '50%', height: '38px', fontSize: '13px' }}
                   />
                   <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>-</span>
                   <input
@@ -825,7 +844,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                     value={maxPrincipal}
                     onChange={(e) => setMaxPrincipal(e.target.value)}
                     className="input font-mono"
-                    style={{ width: '50%', height: '36px', fontSize: '13px' }}
+                    style={{ width: '50%', height: '38px', fontSize: '13px' }}
                   />
                 </div>
               </div>
@@ -840,21 +859,22 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                     className="input"
-                    style={{ width: '60%', height: '36px', fontSize: '12px', fontWeight: 600 }}
+                    style={{ width: '60%', height: '38px', fontSize: '12.5px', fontWeight: 600 }}
                   >
-                    <option value="sl_no">{lang === 'ta' ? 'வரிசை எண் (Sl.No)' : 'Serial No'}</option>
-                    <option value="name">{lang === 'ta' ? 'பெயர் (Name)' : 'Name (A-Z)'}</option>
-                    <option value="remaining">{lang === 'ta' ? 'நிலுவை (Remaining)' : 'Remaining Balance'}</option>
-                    <option value="collection_rate">{lang === 'ta' ? 'வசூல் விகிதம்' : 'Recovery Rate %'}</option>
+                    <option value="sl_no">{lang === 'ta' ? 'வரிசை எண் (Sl.No)' : 'Serial No (#)'}</option>
+                    <option value="name">{lang === 'ta' ? 'பெயர் (Name A-Z)' : 'Borrower Name (A-Z)'}</option>
+                    <option value="remaining">{lang === 'ta' ? 'நிலுவை (Remaining)' : 'Remaining Balance (₹)'}</option>
+                    <option value="principal">{lang === 'ta' ? 'அசல் தொகை (Principal)' : 'Principal Amount (₹)'}</option>
+                    <option value="collection_rate">{lang === 'ta' ? 'வசூல் விகிதம் (Recovery %)' : 'Recovery Rate (%)'}</option>
                   </select>
                   <select
                     value={sortOrder}
                     onChange={(e) => setSortOrder(e.target.value)}
                     className="input"
-                    style={{ width: '40%', height: '36px', fontSize: '12px', fontWeight: 600 }}
+                    style={{ width: '40%', height: '38px', fontSize: '12.5px', fontWeight: 600 }}
                   >
-                    <option value="asc">Asc (1-9)</option>
-                    <option value="desc">Desc (9-1)</option>
+                    <option value="asc">↑ Asc (1-9 / A-Z)</option>
+                    <option value="desc">↓ Desc (9-1 / Z-A)</option>
                   </select>
                 </div>
               </div>
@@ -1805,14 +1825,49 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
               {/* KPI Summary Cards */}
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                gap: '8px'
+                gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                gap: '10px'
               }}>
-                <StatCard label={lang === 'ta' ? 'மொத்த வரிசைகள்' : 'Total Rows'} value={importPreviewData.summary?.total_rows || 0} color="var(--text-primary)" />
-                <StatCard label={lang === 'ta' ? 'செல்லுபடியாகும்' : 'Valid Rows'} value={importPreviewData.summary?.valid_rows || 0} color="var(--emerald-primary)" />
-                <StatCard label={lang === 'ta' ? 'எச்சரிக்கைகள்' : 'Phone Warnings'} value={importPreviewData.summary?.duplicate_phones_count || 0} color={importPreviewData.summary?.duplicate_phones_count > 0 ? '#B45309' : 'var(--text-muted)'} />
-                <StatCard label={lang === 'ta' ? 'மொத்த அசல்' : 'Total Principal'} value={`₹${(importPreviewData.summary?.total_principal || 0).toLocaleString('en-IN')}`} color="var(--indigo-primary)" />
-                <StatCard label={lang === 'ta' ? 'மொத்த வசூல்' : 'Total Collections'} value={`₹${(importPreviewData.summary?.total_collections || 0).toLocaleString('en-IN')}`} color="var(--emerald-primary)" />
+                <StatCard
+                  label={lang === 'ta' ? 'மொத்த வரிசைகள்' : 'Total Rows'}
+                  value={importPreviewData.summary?.total_rows || 0}
+                  color="#1E293B"
+                  bg="#F8FAFC"
+                  border="#E2E8F0"
+                  icon={Layers}
+                />
+                <StatCard
+                  label={lang === 'ta' ? 'செல்லுபடியாகும்' : 'Valid Rows'}
+                  value={importPreviewData.summary?.valid_rows || 0}
+                  color="#166534"
+                  bg="#F0FDF4"
+                  border="#BBF7D0"
+                  icon={CheckCircle2}
+                />
+                <StatCard
+                  label={lang === 'ta' ? 'எச்சரிக்கைகள்' : 'Phone Warnings'}
+                  value={importPreviewData.summary?.duplicate_phones_count || 0}
+                  color={importPreviewData.summary?.duplicate_phones_count > 0 ? '#B45309' : '#64748B'}
+                  bg={importPreviewData.summary?.duplicate_phones_count > 0 ? '#FFFBEB' : '#F8FAFC'}
+                  border={importPreviewData.summary?.duplicate_phones_count > 0 ? '#FDE68A' : '#E2E8F0'}
+                  icon={AlertTriangle}
+                />
+                <StatCard
+                  label={lang === 'ta' ? 'மொத்த அசல்' : 'Total Principal'}
+                  value={`₹${(importPreviewData.summary?.total_principal || 0).toLocaleString('en-IN')}`}
+                  color="#3730A3"
+                  bg="#EEF2FF"
+                  border="#C7D2FE"
+                  icon={IndianRupee}
+                />
+                <StatCard
+                  label={lang === 'ta' ? 'மொத்த வசூல்' : 'Total Collections'}
+                  value={`₹${(importPreviewData.summary?.total_collections || 0).toLocaleString('en-IN')}`}
+                  color="#065F46"
+                  bg="#ECFDF5"
+                  border="#A7F3D0"
+                  icon={TrendingUp}
+                />
               </div>
 
               {/* Warnings Accordion Banner (if duplicate phones / issues found) */}
@@ -2087,20 +2142,44 @@ function ActiveFilterTag({ label, onRemove }) {
   );
 }
 
-function StatCard({ label, value, color }) {
+function StatCard({ label, value, color = '#1E293B', bg = '#F8FAFC', border = '#E2E8F0', icon: Icon }) {
   return (
     <div style={{
       display: 'flex',
-      flexDirection: 'column',
-      gap: '2px',
-      padding: '8px 12px',
-      borderRadius: 'var(--radius-md)',
-      background: 'var(--bg-surface)',
-      border: '1px solid var(--border-subtle)',
-      boxShadow: 'var(--shadow-sm)'
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: '10px 14px',
+      borderRadius: '10px',
+      background: bg,
+      border: `1.5px solid ${border}`,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+      transition: 'transform 0.15s ease, box-shadow 0.15s ease'
     }}>
-      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>{label}</span>
-      <span className="font-mono" style={{ fontSize: '15px', fontWeight: 800, color }}>{value}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+        <span style={{ fontSize: '11px', color: '#475569', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+          {label}
+        </span>
+        <span className="font-mono" style={{ fontSize: '17px', fontWeight: 900, color: color, letterSpacing: '-0.3px', lineHeight: 1.2 }}>
+          {value}
+        </span>
+      </div>
+      {Icon && (
+        <div style={{
+          width: '34px',
+          height: '34px',
+          borderRadius: '8px',
+          background: 'rgba(255, 255, 255, 0.9)',
+          border: `1px solid ${border}`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: color,
+          flexShrink: 0,
+          boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+        }}>
+          <Icon size={18} strokeWidth={2.4} />
+        </div>
+      )}
     </div>
   );
 }

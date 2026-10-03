@@ -17,6 +17,151 @@ function formatRupee(num) {
   return `Rs. ${n.toLocaleString('en-IN')}`;
 }
 
+// Known Tamil words and geographical areas dictionary for clean Latin output in jsPDF
+const TAMIL_DICTIONARY = {
+  'முருகன்': 'Murugan',
+  'செல்வி': 'Selvi',
+  'லக்ஷ்மி': 'Lakshmi',
+  'விஜய்': 'Vijay',
+  'ரேவதி': 'Revathi',
+  'முத்து': 'Muthu',
+  'கார்த்திக்': 'Karthik',
+  'அலங்காநல்லூர்': 'Alanganallur',
+  'வாடிப்பட்டி': 'Vadipatti',
+  'மேலூர்': 'Melur',
+  'வில்லாபுரம்': 'Villapuram',
+  'திருப்பரங்குன்றம்': 'Thiruparankundram',
+  'மதுரை': 'Madurai',
+  'உசிலம்பட்டி': 'Usilampatti',
+  'சோழவந்தான்': 'Sholavandan',
+  'சமயநல்லூர்': 'Samayanallur',
+  'செல்லூர்': 'Sellur',
+  'திருமங்கலம்': 'Thirumangalam',
+  'திண்டுக்கல்': 'Dindigul',
+  'தேனி': 'Theni',
+  'சிவகங்கை': 'Sivagangai',
+  'விருதுநகர்': 'Virudhunagar',
+  'அக்டோபர்': 'October',
+  'நவம்பர்': 'November',
+  'டிசம்பர்': 'December',
+  'ஜனவரி': 'January',
+  'பிப்ரவரி': 'February',
+  'மார்ச்': 'March',
+  'ஏப்ரல்': 'April',
+  'மே': 'May',
+  'ஜூன்': 'June',
+  'ஜூலை': 'July',
+  'ஆகஸ்ட்': 'August',
+  'செப்டம்பர்': 'September'
+};
+
+// Transliterate Tamil unicode characters to clean Latin syllables
+function transliterateTamil(text) {
+  if (!text) return '';
+
+  const trimmed = text.trim();
+  if (TAMIL_DICTIONARY[trimmed]) {
+    return TAMIL_DICTIONARY[trimmed];
+  }
+
+  const vowels = {
+    '\u0B85': 'A', '\u0B86': 'Aa', '\u0B87': 'I', '\u0B88': 'Ee',
+    '\u0B89': 'U', '\u0B8A': 'Oo', '\u0B8E': 'E', '\u0B8F': 'Ae',
+    '\u0B90': 'Ai', '\u0B92': 'O', '\u0B93': 'Oo', '\u0B94': 'Au'
+  };
+
+  const consonants = {
+    '\u0B95': 'k', '\u0B99': 'ng', '\u0B9A': 's', '\u0B9E': 'ny',
+    '\u0B9F': 't', '\u0BA3': 'n', '\u0BA4': 'th', '\u0BA8': 'n',
+    '\u0BAA': 'p', '\u0BAE': 'm', '\u0BAF': 'y', '\u0BB0': 'r',
+    '\u0BB2': 'l', '\u0BB5': 'v', '\u0BB4': 'zh', '\u0BB3': 'l',
+    '\u0BB1': 'r', '\u0BA9': 'n', '\u0B9C': 'j', '\u0BA7': 'sh',
+    '\u0BB8': 's', '\u0BB9': 'h'
+  };
+
+  const diacritics = {
+    '\u0BBE': 'aa', '\u0BBF': 'i', '\u0BC0': 'ee', '\u0BC1': 'u',
+    '\u0BC2': 'oo', '\u0BC6': 'e', '\u0BC7': 'ae', '\u0BC8': 'ai',
+    '\u0BCA': 'o', '\u0BCB': 'o', '\u0BCC': 'au'
+  };
+
+  const virama = '\u0BCD';
+
+  let out = '';
+  const len = text.length;
+
+  for (let i = 0; i < len; i++) {
+    const ch = text[i];
+    const next = i + 1 < len ? text[i + 1] : null;
+
+    if (vowels[ch]) {
+      out += vowels[ch];
+      continue;
+    }
+
+    if (consonants[ch]) {
+      const base = consonants[ch];
+      if (next === virama) {
+        out += base;
+        i++;
+      } else if (next && diacritics[next]) {
+        out += base + diacritics[next];
+        i++;
+      } else {
+        out += base + 'a';
+      }
+      continue;
+    }
+
+    if (/[\x20-\x7E]/.test(ch)) {
+      out += ch;
+    }
+  }
+
+  return out.replace(/\b[a-z]/g, c => c.toUpperCase()).trim();
+}
+
+/**
+ * Sanitize and format text for jsPDF standard fonts (Helvetica).
+ * jsPDF built-in fonts only support Latin/ASCII characters.
+ * Extracts clean Roman/English text from bilingual strings or phonetically transliterates Tamil.
+ */
+export function cleanPdfText(text) {
+  if (!text) return '-';
+  let str = String(text).trim();
+
+  // If format "Tamil (English)", extract English
+  const parenMatch = str.match(/\(([^)]+)\)/);
+  if (parenMatch) {
+    const inside = parenMatch[1].trim();
+    const outside = str.replace(/\([^)]+\)/, '').trim();
+    if (/[a-zA-Z]/.test(outside)) {
+      return outside;
+    }
+    if (/[a-zA-Z]/.test(inside)) {
+      return inside;
+    }
+  }
+
+  // Check if string contains English/Latin characters
+  if (/[a-zA-Z]/.test(str)) {
+    let cleaned = str.replace(/\([^)]*[\u0B80-\u0BFF]+[^)]*\)/g, '').trim();
+    cleaned = cleaned.replace(/[\u0B80-\u0BFF]/g, '').trim();
+    cleaned = cleaned.replace(/\(\s*\)/g, '').replace(/,\s*,/g, ',').replace(/^[, -]+|[, -]+$/g, '').trim();
+    if (cleaned) return cleaned;
+  }
+
+  // If pure Tamil (or mostly Tamil), transliterate phonetically to English
+  if (/[\u0B80-\u0BFF]/.test(str)) {
+    const transliterated = transliterateTamil(str);
+    if (transliterated) return transliterated;
+  }
+
+  // Final fallback: strip non-ASCII to prevent PDF glyph corruption
+  const asciiOnly = str.replace(/[^\x20-\x7E]/g, '').trim();
+  return asciiOnly || '-';
+}
+
 /**
  * Download ALR Daily Collection Register as a beautifully formatted PDF.
  *
@@ -107,7 +252,7 @@ export function downloadRegisterPdf({
   const slRangeText = hasRange
     ? `Range/Code: ${filters.from_sl_no || 'Start'} to ${filters.to_sl_no || 'End'}`
     : 'Range: All';
-  const areaText = `Area: ${filters.village || 'All Locations'}`;
+  const areaText = `Area: ${cleanPdfText(filters.village) || 'All Locations'}`;
   const principalText = (filters.minPrincipal > 0 || (filters.maxPrincipal && filters.maxPrincipal < Infinity))
     ? `Principal: Rs. ${filters.minPrincipal || 0} - Rs. ${filters.maxPrincipal || 'Any'}`
     : 'Principal: All';
@@ -180,22 +325,33 @@ export function downloadRegisterPdf({
   let bodyRows = [];
 
   if (!showDays) {
-    // Standard Summary Register View (Clean, wide, easily readable)
+    // Standard Summary Register View (Clean, wide, 269mm total width, perfectly aligned)
     headCols = [
-      ['Sl', 'Borrower Name', 'Phone', 'Address / Area', 'Principal', 'Collected', 'Remaining', 'Excess', 'Rate %', 'Status']
+      [
+        { content: 'Sl', styles: { halign: 'center' } },
+        { content: 'Borrower Name', styles: { halign: 'left' } },
+        { content: 'Phone', styles: { halign: 'center' } },
+        { content: 'Address / Route Area', styles: { halign: 'left' } },
+        { content: 'Principal', styles: { halign: 'right' } },
+        { content: 'Collected', styles: { halign: 'right' } },
+        { content: 'Remaining', styles: { halign: 'right' } },
+        { content: 'Excess', styles: { halign: 'right' } },
+        { content: 'Rate %', styles: { halign: 'center' } },
+        { content: 'Status', styles: { halign: 'center' } }
+      ]
     ];
 
     colStyles = {
-      0: { halign: 'center', cellWidth: 12 },
-      1: { halign: 'left', cellWidth: 46, fontStyle: 'bold' },
+      0: { halign: 'center', cellWidth: 14 },
+      1: { halign: 'left', cellWidth: 50, fontStyle: 'bold' },
       2: { halign: 'center', cellWidth: 26 },
-      3: { halign: 'left', cellWidth: 38 },
-      4: { halign: 'right', cellWidth: 26 },
-      5: { halign: 'right', cellWidth: 26, fontStyle: 'bold', textColor: [22, 101, 52] },
-      6: { halign: 'right', cellWidth: 26, fontStyle: 'bold' },
-      7: { halign: 'right', cellWidth: 22 },
+      3: { halign: 'left', cellWidth: 45 },
+      4: { halign: 'right', cellWidth: 24 },
+      5: { halign: 'right', cellWidth: 24, fontStyle: 'bold', textColor: [22, 101, 52] },
+      6: { halign: 'right', cellWidth: 24, fontStyle: 'bold' },
+      7: { halign: 'right', cellWidth: 20 },
       8: { halign: 'center', cellWidth: 18 },
-      9: { halign: 'center', cellWidth: 25 }
+      9: { halign: 'center', cellWidth: 24 }
     };
 
     bodyRows = rows.map((r, idx) => {
@@ -204,9 +360,9 @@ export function downloadRegisterPdf({
       const slDisplay = r.client_code ? `${r.sl_no || idx + 1}\n(${r.client_code})` : (r.sl_no || idx + 1);
       return [
         slDisplay,
-        r.name || '-',
+        cleanPdfText(r.name),
         r.phone || '-',
-        r.address || '-',
+        cleanPdfText(r.address),
         formatNumber(r.principal),
         formatNumber(r.total_collected),
         formatNumber(r.remaining),
@@ -216,7 +372,7 @@ export function downloadRegisterPdf({
       ];
     });
 
-    // Totals Row
+    // Grand Totals Row
     const grandPrincipal = rows.reduce((s, r) => s + r.principal, 0);
     const grandCollected = rows.reduce((s, r) => s + r.total_collected, 0);
     const grandRemaining = rows.reduce((s, r) => s + r.remaining, 0);
@@ -224,10 +380,10 @@ export function downloadRegisterPdf({
     const overallRate = grandPrincipal > 0 ? Math.round((grandCollected / grandPrincipal) * 100) : 0;
 
     bodyRows.push([
-      '',
-      'TOTALS',
-      `${rows.length} Borrowers`,
-      '',
+      '#',
+      `TOTALS (${rows.length} BORROWERS)`,
+      `${rows.length} Active`,
+      'ALL AREAS',
       formatNumber(grandPrincipal),
       formatNumber(grandCollected),
       formatNumber(grandRemaining),
@@ -236,30 +392,44 @@ export function downloadRegisterPdf({
       grandRemaining === 0 ? 'ALL CLEARED' : 'PENDING'
     ]);
   } else {
-    // Detailed Days 1 to 31 View (Compressed for landscape print)
-    const headerRow = ['Sl', 'Name', 'Prin'];
+    // Detailed Days 1 to 31 View (Compressed for landscape print, 269mm total width)
+    const headerRow = [
+      { content: 'Sl', styles: { halign: 'center', fontSize: 7 } },
+      { content: 'Borrower Name', styles: { halign: 'left', fontSize: 7 } },
+      { content: 'Principal', styles: { halign: 'right', fontSize: 7 } }
+    ];
     for (let d = 1; d <= totalDays; d++) {
-      headerRow.push(String(d));
+      headerRow.push({ content: String(d), styles: { halign: 'center', fontSize: 6.2, cellPadding: 0.5 } });
     }
-    headerRow.push('Total', 'Rem', 'Status');
+    headerRow.push(
+      { content: 'Collected', styles: { halign: 'right', fontSize: 7 } },
+      { content: 'Remaining', styles: { halign: 'right', fontSize: 7 } },
+      { content: 'Status', styles: { halign: 'center', fontSize: 7 } }
+    );
     headCols = [headerRow];
 
-    const dayWidth = (pageWidth - 28 - 10 - 32 - 16 - 18 - 18 - 18) / totalDays;
+    // Total width 269mm: fixed cols: 9 + 32 + 15 + 16 + 16 + 16 = 104mm. Remaining 165mm for days.
+    const dayWidth = (pageWidth - 28 - 9 - 32 - 15 - 16 - 16 - 16) / totalDays;
     colStyles = {
-      0: { halign: 'center', cellWidth: 10 },
+      0: { halign: 'center', cellWidth: 9 },
       1: { halign: 'left', cellWidth: 32, fontStyle: 'bold' },
-      2: { halign: 'right', cellWidth: 16 }
+      2: { halign: 'right', cellWidth: 15 }
     };
     for (let d = 1; d <= totalDays; d++) {
-      colStyles[2 + d] = { halign: 'center', cellWidth: dayWidth };
+      colStyles[2 + d] = {
+        halign: 'center',
+        cellWidth: dayWidth,
+        cellPadding: { top: 1.2, right: 0.2, bottom: 1.2, left: 0.2 },
+        fontSize: 6.2
+      };
     }
-    colStyles[3 + totalDays] = { halign: 'right', cellWidth: 18, fontStyle: 'bold', textColor: [22, 101, 52] };
-    colStyles[4 + totalDays] = { halign: 'right', cellWidth: 18, fontStyle: 'bold' };
-    colStyles[5 + totalDays] = { halign: 'center', cellWidth: 18 };
+    colStyles[3 + totalDays] = { halign: 'right', cellWidth: 16, fontStyle: 'bold', textColor: [22, 101, 52] };
+    colStyles[4 + totalDays] = { halign: 'right', cellWidth: 16, fontStyle: 'bold' };
+    colStyles[5 + totalDays] = { halign: 'center', cellWidth: 16 };
 
     bodyRows = rows.map((r, idx) => {
       const slDisplay = r.client_code ? `${r.sl_no || idx + 1}\n(${r.client_code})` : (r.sl_no || idx + 1);
-      const row = [slDisplay, r.name || '-', formatNumber(r.principal)];
+      const row = [slDisplay, cleanPdfText(r.name), formatNumber(r.principal)];
       for (let d = 1; d <= totalDays; d++) {
         const val = (r.days && r.days[d]) || 0;
         row.push(val > 0 ? String(val) : '');
@@ -272,7 +442,7 @@ export function downloadRegisterPdf({
     });
 
     // Totals Row
-    const totalsRow = ['', 'TOTALS', formatNumber(rows.reduce((s, r) => s + r.principal, 0))];
+    const totalsRow = ['#', `TOTALS (${rows.length})`, formatNumber(rows.reduce((s, r) => s + r.principal, 0))];
     for (let d = 1; d <= totalDays; d++) {
       const sum = rows.reduce((s, r) => s + ((r.days && r.days[d]) || 0), 0);
       totalsRow.push(sum > 0 ? String(sum) : '');
@@ -296,15 +466,15 @@ export function downloadRegisterPdf({
       fillColor: [15, 23, 42], // Slate 900
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 8,
-      halign: 'center',
-      cellPadding: 2
+      fontSize: showDays ? 7 : 8,
+      cellPadding: showDays ? 1.6 : 2.2
     },
     styles: {
-      fontSize: 7.5,
-      cellPadding: 1.8,
-      lineColor: [226, 232, 240], // Slate 200 borders
-      lineWidth: 0.2
+      fontSize: showDays ? 6.5 : 7.8,
+      cellPadding: showDays ? 1.4 : 2,
+      lineColor: [203, 213, 225], // Slate 200 borders
+      lineWidth: 0.2,
+      overflow: 'linebreak'
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252] // Slate 50 subtle zebra
@@ -370,22 +540,16 @@ export function downloadRegisterPdf({
         }
       }
     },
-    didDrawPage: function (data) {
-      // Footer on every page
-      const pageStr = `Page ${data.pageNumber} of ${doc.internal.getNumberOfPages()}`;
+    didDrawPage: function () {
+      // Left footer: Confidentiality notice
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.5);
       doc.setTextColor(148, 163, 184); // Slate 400
-
-      // Left footer: Confidentiality notice
       doc.text('Confidential • Daily Collection Microfinance Ledger • ALR Finance System', 14, pageHeight - 7);
-
-      // Right footer: Page number
-      doc.text(pageStr, pageWidth - 14, pageHeight - 7, { align: 'right' });
     }
   });
 
-  // Calculate actual total pages and update
+  // Calculate actual total pages and write crisp, single-pass page numbering
   const totalPages = doc.internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -464,11 +628,11 @@ export function downloadMemberHistoryPdf({
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(71, 85, 105);
-  doc.text(`Name: ${client.name || '-'}`, 18, infoY + 12);
+  doc.text(`Name: ${cleanPdfText(client.name)}`, 18, infoY + 12);
   doc.text(`Serial No: #${client.sl_no || '-'}`, 18, infoY + 18);
 
   doc.text(`Phone: ${client.phone || '-'}`, pageWidth / 2, infoY + 12);
-  doc.text(`Address: ${client.address || '-'}`, pageWidth / 2, infoY + 18);
+  doc.text(`Address: ${cleanPdfText(client.address)}`, pageWidth / 2, infoY + 18);
 
   // Grand Totals Computation
   const grandPrincipal = monthHistory.reduce((s, m) => s + (m.principal || 0), 0);
@@ -503,11 +667,22 @@ export function downloadMemberHistoryPdf({
     doc.text(kpi.val, cx + 3, kpiY + 11);
   });
 
-  // Multi-month History Table
+  // Multi-month History Table (182mm available width)
   const tableStartY = kpiY + 18;
-  const tableHead = [['Month / Cycle', 'Principal', 'Collected', 'Remaining', 'Excess', 'Paid Days', 'Rate', 'Status']];
+  const tableHead = [
+    [
+      { content: 'Month / Cycle', styles: { halign: 'left' } },
+      { content: 'Principal', styles: { halign: 'right' } },
+      { content: 'Collected', styles: { halign: 'right' } },
+      { content: 'Remaining', styles: { halign: 'right' } },
+      { content: 'Excess', styles: { halign: 'right' } },
+      { content: 'Paid Days', styles: { halign: 'center' } },
+      { content: 'Rate %', styles: { halign: 'center' } },
+      { content: 'Status', styles: { halign: 'center' } }
+    ]
+  ];
   const tableBody = monthHistory.map(m => [
-    m.cycle_name || m.month_year,
+    cleanPdfText(m.cycle_name || m.month_year),
     formatNumber(m.principal),
     formatNumber(m.total_collected),
     formatNumber(m.remaining),
@@ -540,19 +715,19 @@ export function downloadMemberHistoryPdf({
       textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 8,
-      halign: 'center'
+      cellPadding: 2.2
     },
-    styles: { fontSize: 8, cellPadding: 2, lineColor: [226, 232, 240] },
+    styles: { fontSize: 8, cellPadding: 2, lineColor: [203, 213, 225], overflow: 'linebreak' },
     alternateRowStyles: { fillColor: [248, 250, 252] },
     columnStyles: {
       0: { halign: 'left', fontStyle: 'bold', cellWidth: 35 },
-      1: { halign: 'right', cellWidth: 24 },
-      2: { halign: 'right', cellWidth: 24, fontStyle: 'bold', textColor: [22, 101, 52] },
-      3: { halign: 'right', cellWidth: 24, fontStyle: 'bold' },
-      4: { halign: 'right', cellWidth: 20 },
+      1: { halign: 'right', cellWidth: 23 },
+      2: { halign: 'right', cellWidth: 23, fontStyle: 'bold', textColor: [22, 101, 52] },
+      3: { halign: 'right', cellWidth: 23, fontStyle: 'bold' },
+      4: { halign: 'right', cellWidth: 18 },
       5: { halign: 'center', cellWidth: 20 },
       6: { halign: 'center', cellWidth: 16 },
-      7: { halign: 'center', cellWidth: 20 }
+      7: { halign: 'center', cellWidth: 24 }
     },
     didParseCell: function (data) {
       if (data.section === 'body') {
