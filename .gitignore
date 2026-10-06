@@ -21,6 +21,13 @@ data/
 *.db-shm
 *.db-info
 
+# Data files, spreadsheets, and document exports (Zero data leak)
+*.xlsx
+*.xls
+*.pdf
+uploads/
+data/uploads/
+
 # Temporary scratch and logs
 scratch/
 *.log

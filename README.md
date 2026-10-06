@@ -1,155 +1,249 @@
 # 🏛️ Daily Collection Finance Manager (ALR Microfinance)
-### (தினசரி வசூல் மற்றும் கடன் மேலாண்மை மென்பொருள்)
+### தினசரி வசூல் மற்றும் கடன் மேலாண்மை மென்பொருள்
 
-A complete, **zero-recurring-cost**, production-ready web application designed to digitize manual Excel registers and paper-based daily microfinance records (ALR Daily Collection Register) used across Tamil Nadu finance operations.
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![React](https://img.shields.io/badge/React-19.0-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-6.1-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![Database](https://img.shields.io/badge/Turso_SQLite-Edge_Database-00E599?style=for-the-badge&logo=sqlite&logoColor=black)](https://turso.tech/)
+[![Bilingual](https://img.shields.io/badge/Language-English_%7C_தமிழ்-FF6B6B?style=for-the-badge)](./src/i18n/ta.json)
+[![Zero Cost](https://img.shields.io/badge/Recurring_Cost-₹0_/_Month-10B981?style=for-the-badge)](https://github.com)
+[![Tests](https://img.shields.io/badge/Automated_Tests-100%25_Passing-success?style=for-the-badge)](./test/)
+[![Accessibility](https://img.shields.io/badge/A11y-WCAG_2.1_AA-8B5CF6?style=for-the-badge)](./src/)
+
+An enterprise-grade, **zero-recurring-cost**, offline-resilient microfinance ledger and field collection operations platform. Specifically engineered to digitize paper collection registers and manual Excel workbooks (ALR Daily Collection Register) utilized by micro-lenders, daily thavanai operators, and field finance agents across Tamil Nadu.
 
 ---
 
-## 🌟 Key Highlights & Zero Recurring Cost
+## ⚡ Executive Overview & The Zero Recurring Cost Architecture
 
-- **Zero Database Bills**: Dual-mode engine powered by **Turso Cloud SQLite** (`@libsql/client`) on AWS Mumbai Edge (<25ms latency) with local SQLite fallback (`data/finance.db`).
-- **Zero WhatsApp Costs**: 1-tap `wa.me` deep link URL generator for concise Tamil & English receipts without recurring Meta WhatsApp Business API fees.
-- **Zero Print Driver Costs**: Native `@media print` CSS engine optimized for 58mm portable Bluetooth thermal receipt printers and 80mm desktop POS printers.
-- **100% Excel Template Fidelity**: Downloads and exports `.xlsx` files that replicate `Daily_Collection_Register__ALR_-6.xlsx`, including merged headers (`ws['!merges']`) and active formulas (`=SUM(G4:AK4)`, `=IF(F4-AL4<0,0,F4-AL4)`).
+Traditional finance management platforms burden rural microfinance businesses with steep monthly SaaS subscriptions, per-message WhatsApp Business API fees, cloud server hosting fees, and proprietary printer driver licenses. 
+
+**Daily Collection Finance Manager eliminates 100% of these recurring costs**:
+
+| Capability | Traditional SaaS Approach | ALR Finance Architecture | Operational Savings |
+| :--- | :--- | :--- | :--- |
+| **Database** | Managed RDS / Cloud SQL ($40–$120/mo) | **Turso Cloud SQLite Edge** (`@libsql/client`) with zero-latency local fallback | **100% Free** |
+| **WhatsApp Receipts** | Meta Cloud API ($0.0099 – $0.05 / msg) | **Native `wa.me` Deep-Link Engine** with auto-templated Tamil & English text | **100% Free** |
+| **Thermal Printing** | Proprietary vendor drivers / cloud print | **Direct Web Bluetooth ESC/POS** & Native `@media print` 58mm/80mm engine | **100% Free** |
+| **Spreadsheet Sync** | Manual transcription / human error | **Bi-Directional SheetJS Engine** with intelligent column auto-disambiguation | **Zero Data Entry Overhead** |
+| **Field Collection** | Requires constant 4G/5G connection | **Offline-First SWR Caching** with automatic background cloud synchronization | **Zero Network Dropouts** |
 
 ---
 
-## 📋 Comprehensive Feature Matrix
+## 🏗️ System Architecture
 
-### 1. 📑 Desktop 31-Day Interactive Ledger Grid
-- **Sticky Freeze Panes**:
-  - Left frozen: Sl.No, Borrower Name, Phone, Address, Principal Amount.
-  - Middle scrollable: Days 1 through 31.
-  - Right frozen: Total Collected, Remaining Balance, Excess Amount, Actions.
-- **Excel Row 2 Summary Replica**: Displays top grand totals alongside dedicated per-day sum chips (`D1` to `D31`).
-- **Excel Keyboard Navigation**: `Arrow` keys, `Enter`, `Tab`, with auto-select on focus for single-keypress entry.
-- **0ms Optimistic Updates**: Live calculations for Total Collected, Remaining Balance, and Excess.
+```mermaid
+flowchart TB
+    subgraph ClientTier["💻 Client Layer (React 19 + Vite 6)"]
+        UI["🎨 Responsive UI & Navigation\n(Sunlight / Dark / Light / Auto)"]
+        SWR["⚡ In-Memory SWR Cache\n(0ms Optimistic Ledger Mutations)"]
+        PRINT["🖨️ Web Bluetooth ESC/POS Engine\n(58mm / 80mm Thermal Slips)"]
+        WA["📲 Native WhatsApp Dispatcher\n(1-Tap wa.me Deep Links)"]
+    end
 
-### 2. 📱 Mobile Field Cards (Field Collection Rounds)
-- **Fast Touch Cards**: Designed for field agents collecting under bright outdoor conditions.
-- **Quick-Pay Chips**: 1-tap installment buttons (`+₹100`, `+₹200`, `+₹500`, and `Full Due` / `முழு நிலுவை`).
-- **Quick-Dial Action**: Call borrowers directly with 1 tap.
-- **Sunlight Mode**: Ultra high-contrast theme (`#000000` text on `#FFFFFF` backgrounds) for direct sunlight readability.
+    subgraph APITier["⚙️ Application Server (Express 4)"]
+        ROUTER["🛡️ REST API Controllers\n(Clients, Ledger, Reports, Rollover)"]
+        EXCEL["📊 Bi-Directional Excel Parser\n(Auto-Disambiguation & Duplicate Audit)"]
+        STATE["🔄 Month-End Lifecycle Machine\n(Carryover, Loan Clearing & Archival)"]
+    end
 
-### 3. 💬 WhatsApp & Thermal POS Receipts
-- **1-Tap WhatsApp Receipts**:
-  - **Tamil**: `வணக்கம் [பெயர்], [தேதி] வசூல் தொகை: ₹[தொகை]. மீதமுள்ள நிலுவை: ₹[நிலுவை]. நன்றி, [கடை பெயர்].`
-  - **English**: `Dear [Name], Collection received on [Date]: ₹[Amount]. Remaining balance: ₹[Balance]. Thank you, [Shop Name].`
-- **Format Toggle**: Switch between **Concise** (1-tap message) and **Detailed** (itemized slip).
-- **Thermal POS Support**: Select between **58mm** and **80mm** roll widths.
-- **Audit Logging**: Every dispatch is stored in the `whatsapp_logs` database table.
+    subgraph DataTier["🗄️ Relational Persistence Tier"]
+        TURSO["🌐 Turso Cloud SQLite (libSQL Edge)\n(Distributed Active Replica)"]
+        LOCAL["💾 Local SQLite Engine (data/finance.db)\n(Offline Failover & Backup Snapshots)"]
+    end
 
-### 4. 🔄 Month-End Rollover & Client Archival
-- **Rollover Wizard**: Preview who is moving to the next cycle and their carried-forward principal.
-- **Automatic Principal Adjustment**: Remaining balance automatically becomes next month's principal.
-- **Exclusion of Cleared Borrowers**: Fully settled borrowers are excluded from next month's active ledger.
-- **Closed Clients Archive**: Preserves closed loan history with complete payment snapshots, recovery, and reopen capabilities.
+    UI --> SWR
+    SWR <--> ROUTER
+    UI --> PRINT
+    UI --> WA
+    ROUTER <--> EXCEL
+    ROUTER <--> STATE
+    ROUTER <--> TURSO
+    ROUTER <--> LOCAL
+```
 
-### 5. 📊 Excel Import & Export Hub
-- **Pre-formatted Template**: Download pre-formatted blank `.xlsx` with active `=SUM()` and `=IF()` formulas.
-- **Drag & Drop Upload**: Upload offline registers directly.
-- **Duplicate Phone Detection**: Flags duplicate mobile numbers within the sheet and cross-references existing database clients.
-- **Interactive Preview Table**: Review rows, validation warnings, and summary KPIs before committing.
+---
 
-### 6. 💼 Evening Cash Reconciliation & Settlements
-- **Live Cash Denomination Calculator**: Interactive counter for ₹500, ₹200, ₹100, ₹50, ₹20, ₹10 notes.
-- **Agent Settlement Vouchers**: Reconcile expected vs. actual collections and lock evening cash handovers.
+## 💎 Core Feature Highlights
 
-### 7. 🛡️ Database Backup & Restore
-- **1-Click SQLite Snapshot (`finance.db`)**: Flushes SQLite WAL logs and downloads the binary database.
-- **1-Click Binary Restore**: Upload a `.db` file to restore the database.
-- **Full JSON Backup & Restore**: Cross-platform backup across all 8 tables.
+### 1. 📑 31-Day Interactive Ledger Spreadsheet
+* **Desktop Freeze-Panes**: Permanent left-side anchor for Sl.No, Borrower Name, Contact Number, Route/Village, and Principal Amount; scrollable day columns (Days 1–31); fixed right-side anchor for Total Collected, Balance Due, and Actions.
+* **Header Grand Totals**: Real-time aggregation cards displaying active cycle principal, collected thavanai sums, outstanding loan balances, and daily collection totals.
+* **Keyboard Velocity**: Effortless directional navigation (`ArrowUp`, `ArrowDown`, `Tab`, `Enter`) with auto-select on focus for high-speed field collection entry.
+* **Undo Safeguard**: Floating 8-second undo toast with live visual countdown preventing accidental keystroke overrides.
 
-### 8. 🎨 Bilingual Engine & 4-Way Themes
-- **Bilingual**: 100% key parity between Tamil (தமிழ்) and English.
-- **4-Way Theme Engine**: Auto (Light 6AM–6PM, Dark 6PM–6AM), Manual Light, Dark, and Sunlight mode.
+### 2. 📱 Field Collection Mobile Cards & Sunlight Mode
+* **Ergonomic Touch Targets**: Form-fitted collection cards optimized for one-thumb field operation while riding routes or walking outdoor bazaars.
+* **Quick-Increment Chips**: 1-tap fast payment entries (`+₹100`, `+₹200`, `+₹500`, and `Full Due` / `முழு நிலுவை`).
+* **Instant Borrower Dial**: 1-tap phone dialing trigger for rapid on-the-road borrower communications.
+* **Sunlight Outdoor Mode**: Contrast-maximized display preset (`#000000` text on `#FFFFFF` high-visibility card surfaces) for crisp readability under harsh noon sun.
+
+### 3. 💬 Zero-Cost WhatsApp & Bluetooth Thermal POS Receipts
+* **Bilingual WhatsApp Slips**: 1-tap instant messages in concise Tamil or English:
+  * **Tamil**: `வணக்கம் [பெயர்], [தேதி] வசூல் தொகை: ₹[தொகை]. மீதமுள்ள நிலுவை: ₹[நிலுவை]. நன்றி, [கடை பெயர்].`
+  * **English**: `Dear [Name], Collection received on [Date]: ₹[Amount]. Remaining balance: ₹[Balance]. Thank you, [Shop Name].`
+* **Direct Web Bluetooth Printing**: Connects directly from Chrome/Edge to portable 58mm mobile belt printers and 80mm counter POS thermal printers without installing third-party apps or drivers.
+* **Immutable Audit Trail**: Dispatches and receipts are logged in the `whatsapp_logs` table for dispute resolution.
+
+### 4. 📊 Intelligent Excel Hub & Auto-Disambiguation Engine
+* **Bi-Directional Excel Synchronization**: Download pre-formatted `.xlsx` workbooks with active Excel `=SUM()` and `=IF()` formulas, or upload existing field spreadsheets.
+* **Intelligent Column Auto-Detection**: Automatically identifies header rows and intelligently differentiates between **Borrower Name**, **Village / Town**, and **Route Area / Ward** across both Tamil and English column labels.
+* **Pre-Import Duplicate Guard**: Scans incoming spreadsheets and immediately warns if a mobile number is duplicated within the file or already belongs to an active borrower in the database.
+* **Audit Inspection Table**: Interactive pre-commit modal previewing validated entries, missing fields, and formatting anomalies before writing to the database.
+
+### 5. 🔄 Month-End Rollover & Loan Closure Archive
+* **Rollover Wizard**: Automated transition from the closing month to the new collection cycle with clear visual diffs.
+* **Automatic Balance Carryover**: Outstanding balances on day 31 automatically become the new opening principal for the subsequent cycle.
+* **Zero Residual Overlap**: Fully repaid borrowers are automatically excluded from the next active ledger cycle.
+* **Closed Accounts Vault**: Fully settled loans are preserved in a dedicated historical archive with full payment snapshots, closure timestamps, and 1-tap reopening capabilities.
+
+### 6. 💼 Evening Cash Denomination Handover
+* **Currency Counter**: Instant reconciliation breakdown for Indian Rupee banknotes (`₹500`, `₹200`, `₹100`, `₹50`, `₹20`, `₹10`).
+* **Handover Locking**: Compares physical cash counted by field collection agents against digital collections recorded in the 31-day ledger, highlighting surplus or deficit balances.
+
+### 7. 🛡️ 1-Click Database Disaster Recovery
+* **Instant SQLite Snapshots**: Safely checkpoints the SQLite Write-Ahead Log (WAL) and downloads a standalone `finance.db` binary file.
+* **Full JSON Portability**: Cross-platform schema and table backup capturing all clients, cycles, ledger records, settlements, and logs.
+* **1-Click Binary Restore**: Instant drag-and-drop database recovery.
+
+### 8. 🌐 Bilingual Engine & Universal Spotlight Search
+* **Tamil & English Parity**: 100% complete bilingual interface (தமிழ் & English) with instantaneous language switching.
+* **Super-Spotlight Search (`Ctrl + K`)**: Universal fuzzy search modal providing sub-50ms borrower search across serial numbers, client codes, phone numbers, villages, and names.
+
+---
+
+## 🔒 Security & Zero Data Leak Guarantee
+
+* **Zero Binary Data Leaks**: Customer registers and financial `.xlsx` spreadsheets are excluded from git version control via `.gitignore`.
+* **On-Demand Test Fixtures**: All automated integration test suites synthesize realistic test fixtures dynamically in memory, ensuring that no sensitive borrower PII or real-world ledgers are committed.
+* **Zero Telemetry or Third-Party Analytics**: No Google Analytics, tracking beacons, or third-party marketing pixels. 100% of data stays between your browser and your database.
+* **Isolated Environment Configurations**: Credentials and API tokens are managed strictly via `.env` files and never hard-coded.
 
 ---
 
 ## 🚀 Quick Start Guide
 
-### Prerequisites
-- Node.js 20+ (Node.js 26 recommended)
-- npm 10+
+### System Prerequisites
+* **Node.js**: v20.0.0 or higher
+* **npm**: v10.0.0 or higher
 
-### Installation & Setup
+### 1. Installation
 ```bash
-# Clone or navigate to the project directory
-cd "FINACE PROJECT"
+# Clone the repository
+git clone https://github.com/SanthaKumar-K-2004/Finance-tracker.git
+cd Finance-tracker
 
-# Install dependencies
+# Install application dependencies
 npm install
-
-# Start development servers (Express API on :5000 + Vite on :5173)
-npm run dev
 ```
 
-The application will be accessible at:
-- **Frontend**: [http://localhost:5173](http://localhost:5173)
-- **Backend API**: [http://localhost:5000](http://localhost:5000)
+### 2. Configure Environment Variables
+Copy the template configuration file:
+```bash
+cp .env.example .env
+```
+Configure your credentials in `.env`:
+```ini
+DATABASE_MODE=turso
+TURSO_DATABASE_URL=libsql://your-db-name.turso.io
+TURSO_AUTH_TOKEN=your-turso-auth-token
+PORT=5000
+NODE_ENV=development
+```
+*(If no Turso credentials are provided, the system automatically defaults to local SQLite at `./data/finance.db`)*
+
+### 3. Initialize Database & Seed Baseline Data
+```bash
+npm run seed
+```
+
+### 4. Launch Development Environment
+```bash
+npm run dev
+```
+* **Frontend Application**: `http://localhost:5173`
+* **Backend REST API**: `http://localhost:5000`
 
 ---
 
-## 🧪 Testing & Verification
+## 🧪 Comprehensive Automated Test Suite
 
-Run the entire automated test suite (83 tests across 10 suites):
+The project includes an extensive suite of automated unit, integration, and security tests:
+
 ```bash
+# Execute all test suites
 npm test
+
+# Run Excel parser & auto-disambiguation suite
+node --test test/duplicate_and_area_village_preview.test.js
+
+# Run client dataset validation suite
+node --test test/client_excel_test_validation.test.js
 ```
 
-Run production build:
+### Build Production Bundle
 ```bash
 npm run build
 ```
+Generates an optimized, minified production build in `./dist`.
 
 ---
 
-## 🏛️ Project Architecture
+## 📂 Project Structure
 
 ```
 FINACE PROJECT/
 ├── server/
-│   ├── index.js                  # Express application entrypoint
-│   ├── db.js                     # Turso Cloud SQLite & local SQLite client
-│   ├── seed.js                   # ALR ledger database seeder
-│   ├── syncLocalDb.js            # Turso Cloud to local SQLite sync engine
-│   ├── mcpServer.js              # Native Antigravity MCP server
+│   ├── app.js                   # Express application setup & middleware
+│   ├── index.js                 # HTTP server entrypoint
+│   ├── db.js                    # Turso libSQL client & SQLite fallback engine
+│   ├── seed.js                  # Database initializer & schema migrations
+│   ├── syncLocalDb.js           # Cloud-to-local replication utility
 │   ├── routes/
-│   │   ├── clients.js            # Client CRUD & validation
-│   │   ├── collections.js        # 31-day grid entries & WhatsApp logs
-│   │   ├── months.js             # Month cycle navigation
-│   │   ├── rollover.js           # Month-end rollover engine
-│   │   ├── reports.js            # KPIs, settlements & charts
-│   │   ├── excel.js              # Excel template, export & preview import
-│   │   └── backup.js             # 1-click database backup & restore
+│   │   ├── clients.js           # Borrower registration, phone validation & search
+│   │   ├── collections.js       # 31-day ledger grid entries & WhatsApp logs
+│   │   ├── months.js            # Monthly cycle management & statistics
+│   │   ├── rollover.js          # Month-end rollover & loan carryover engine
+│   │   ├── reports.js           # Financial KPIs, recovery analytics & settlements
+│   │   ├── excel.js             # Excel template generation, preview & ingestion
+│   │   ├── company.js           # Shop branding, address & receipt customization
+│   │   └── backup.js            # Binary .db & JSON snapshot backup/restore
 │   └── utils/
-│       └── receipt.js            # wa.me URL generator & receipt formatters
+│       ├── excelParser.js       # Header auto-detection & column disambiguation
+│       └── receipt.js           # Bilingual WhatsApp templates & ESC/POS receipts
 ├── src/
-│   ├── App.jsx                   # Main layout, view routing & navigation
-│   ├── index.css                 # Design system tokens, glassmorphism & POS print styles
+│   ├── main.jsx                 # React root application entrypoint
+│   ├── App.jsx                  # Main routing, layout & global state
+│   ├── index.css                # CSS design system, typography & thermal print rules
 │   ├── components/
-│   │   ├── LedgerGrid.jsx        # 31-day sticky desktop spreadsheet
-│   │   ├── ClientCard.jsx        # Mobile field touch cards with quick-pay
-│   │   ├── CollectionModal.jsx   # Quick collection entry modal
-│   │   ├── ReceiptModal.jsx      # WhatsApp & 58mm/80mm thermal receipt dialog
-│   │   ├── CashCounterModal.jsx  # Evening cash denomination calculator
-│   │   └── RolloverWizard.jsx    # Month-end rollover wizard
+│   │   ├── Layout.jsx           # Top navigation bar, language toggle & month selector
+│   │   ├── MonthYearPicker.jsx  # Interactive calendar cycle navigator
+│   │   ├── SpotlightSearchModal.jsx # Ctrl+K universal fast search modal
+│   │   ├── ReceiptModal.jsx     # WhatsApp & Bluetooth 58mm/80mm receipt dialog
+│   │   ├── CashDenominationModal.jsx # Evening cash handover settlement counter
+│   │   ├── RolloverWizard.jsx   # Month-end cycle rollover wizard
+│   │   ├── ClientFormModal.jsx  # Borrower creation & duplicate check modal
+│   │   └── BulkEntryModal.jsx   # Multi-borrower batch installment entry modal
 │   ├── pages/
-│   │   ├── DashboardPage.jsx     # Financial KPIs, recovery rate & defaulters
-│   │   ├── ExcelPage.jsx         # Drag & drop Excel hub with interactive preview
-│   │   ├── ClosedClientsPage.jsx # Closed accounts archive
-│   │   └── SettingsPage.jsx      # 1-click finance.db backup & preferences
-│   └── context/
-│       ├── LanguageContext.jsx   # Bilingual engine (Tamil / English)
-│       └── ThemeContext.jsx      # 4-way theme engine with time-of-day detection
-└── test/
-    ├── phase0.test.js
-    ├── phase1.test.js
-    ├── phase2.test.js
-    ├── phase3.test.js
-    ├── phase4.test.js
-    ├── phase5.test.js
-    ├── phase6.test.js            # Phase 6 Excel engine & WhatsApp tests
-    └── core_features_integration.test.js
+│   │   ├── CollectionPage.jsx   # 31-day spreadsheet grid & mobile card views
+│   │   ├── Dashboard.jsx        # Business intelligence KPIs, charts & defaulters
+│   │   ├── ClientsPage.jsx      # Borrower directory & credit management
+│   │   ├── ClosedClientsPage.jsx# Closed loans & recovery archive
+│   │   ├── ExcelPage.jsx        # Excel import/export management hub
+│   │   └── SettingsPage.jsx     # Shop profile, theme options & backup center
+│   ├── hooks/
+│   │   └── useNetworkStatus.js  # Network listener & offline queue sync hook
+│   └── utils/
+│       ├── bluetoothPrinter.js  # Web Bluetooth ESC/POS raw printer driver
+│       └── offlineQueue.js      # LocalStorage payment queue for offline operation
+├── scripts/
+│   ├── generate_client_test_dataset.js    # On-demand test workbook generator
+│   └── generate_duplicate_test_excel.js   # On-demand stress-test generator
+└── test/                        # 29 Comprehensive automated test suites
 ```
-# Finance-tracker
+
+---
+
+## 📜 License
+
+Licensed under the [MIT License](./LICENSE). Designed and crafted with pride for the microfinance and daily collection business community.

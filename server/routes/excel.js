@@ -9,7 +9,7 @@ import { serverCache } from '../utils/cache.js';
 import { parseCurrencyNumber } from '../utils/currency.js';
 import { sanitizeMonthYear } from '../utils/date.js';
 import { matchesIdentifierRange, cleanIdentifier } from '../utils/identifierFilter.js';
-import { detectHeaderAndColumns, extractClientRowData } from '../utils/excelParser.js';
+import { detectHeaderAndColumns, extractClientRowData, inspectAvailableColumns } from '../utils/excelParser.js';
 
 const router = Router();
 const XLSX = xlsx.default || xlsx;
@@ -332,25 +332,31 @@ router.get('/export', async (req, res) => {
   }
 });
 
-// POST validate & interactive preview of uploaded Excel file
+// POST validate & interactive preview of uploaded Excel or CSV file
 router.post('/preview', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ success: false, error: 'No Excel file uploaded' });
+      return res.status(400).json({ success: false, error: 'No Excel or CSV file uploaded' });
     }
 
     const companyId = 'comp_alr_001';
     const filePath = req.file.path;
     const wb = XLSX.readFile(filePath);
-    const sheetName = wb.SheetNames[0];
-    const sheet = wb.Sheets[sheetName];
+    const sheetNames = wb.SheetNames || ['Sheet1'];
+
+    // Select target sheet
+    let activeSheetName = req.body?.sheet_name;
+    if (!activeSheetName || !sheetNames.includes(activeSheetName)) {
+      activeSheetName = sheetNames[0];
+    }
+    const sheet = wb.Sheets[activeSheetName];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
-    if (!rows || rows.length < 3) {
+    if (!rows || rows.length < 2) {
       try { fs.unlinkSync(filePath); } catch (_) {}
       return res.status(400).json({
         success: false,
-        error: 'Invalid file: Sheet has insufficient rows for ALR register.'
+        error: 'Invalid file: Sheet has insufficient rows for data preview.'
       });
     }
 
@@ -390,8 +396,23 @@ router.post('/preview', upload.single('file'), async (req, res) => {
 
     // Detect column positions dynamically (Area, Village, Address, Name, Phone, Principal)
     const detected = detectHeaderAndColumns(rows);
+    let mapping = detected.mapping;
     const dataStartIndex = detected.dataStartIndex;
-    const mapping = detected.mapping;
+
+    // Support client-provided column mapping override
+    if (req.body?.column_mapping) {
+      try {
+        const custom = typeof req.body.column_mapping === 'string'
+          ? JSON.parse(req.body.column_mapping)
+          : req.body.column_mapping;
+        if (custom && typeof custom === 'object') {
+          mapping = { ...mapping, ...custom };
+        }
+      } catch (_) {}
+    }
+
+    // Inspect available column headers and samples for UI mapping
+    const availableColumns = inspectAvailableColumns(rows, detected.headerRowIndex, 3);
 
     // Data rows start from detected dataStartIndex
     for (let i = dataStartIndex; i < rows.length; i++) {
@@ -401,7 +422,7 @@ router.post('/preview', upload.single('file'), async (req, res) => {
       const extracted = extractClientRowData(row, mapping, i - dataStartIndex + 1, totalDays);
       if (!extracted) continue;
 
-      const { slNo, date, name, phone, address, principal, dayEntries, collectionSum } = extracted;
+      const { slNo, date, name, phone, village, area, address, principal, dayEntries, collectionSum } = extracted;
 
       // Skip empty or summary/totals footer rows
       if (!name && !phone) continue;
@@ -473,6 +494,8 @@ router.post('/preview', upload.single('file'), async (req, res) => {
         date,
         name,
         phone,
+        village,
+        area,
         address,
         principal,
         collected_days_count: dayEntries.length,
@@ -489,6 +512,21 @@ router.post('/preview', upload.single('file'), async (req, res) => {
     res.json({
       success: true,
       filename: req.file.originalname,
+      sheet_names: sheetNames,
+      active_sheet: activeSheetName,
+      available_columns: availableColumns,
+      header_row_index: detected.headerRowIndex,
+      detected_mapping: {
+        nameCol: mapping.nameCol,
+        phoneCol: mapping.phoneCol,
+        villageCol: mapping.villageCol,
+        areaCol: mapping.areaCol,
+        addressCol: mapping.addressCol,
+        principalCol: mapping.principalCol,
+        slNoCol: mapping.slNoCol,
+        dateCol: mapping.dateCol,
+        isAutoDetected: detected.isAutoDetected
+      },
       total_days: totalDays,
       summary: {
         total_rows: previewRows.length,
@@ -524,25 +562,44 @@ router.post('/import', upload.single('file'), async (req, res) => {
     const autoCycleName = (yNum && mNum && mNum >= 1 && mNum <= 12) ? `${monthNames[mNum - 1]} ${yNum}` : `${month_year} Cycle`;
     const cycle_name = req.body?.cycle_name || autoCycleName;
     const companyId = 'comp_alr_001';
+    const duplicateHandling = req.body?.duplicate_handling || 'update';
 
     const totalDays = (yNum && mNum) ? new Date(yNum, mNum, 0).getDate() : 31;
     const endDate = `${month_year}-${String(totalDays).padStart(2, '0')}`;
 
     const filePath = req.file.path;
     const wb = XLSX.readFile(filePath);
-    const sheetName = wb.SheetNames[0];
-    const sheet = wb.Sheets[sheetName];
+    const sheetNames = wb.SheetNames || ['Sheet1'];
+
+    let activeSheetName = req.body?.sheet_name;
+    if (!activeSheetName || !sheetNames.includes(activeSheetName)) {
+      activeSheetName = sheetNames[0];
+    }
+    const sheet = wb.Sheets[activeSheetName];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
     let newClients = 0;
     let updatedClients = 0;
+    let skippedClients = 0;
     let importedCollections = 0;
     const collectionStatements = [];
 
-    // Detect column positions dynamically (Area, Village, Address, Name, Phone, Principal)
+    // Detect column positions dynamically
     const detected = detectHeaderAndColumns(rows);
+    let mapping = detected.mapping;
     const dataStartIndex = detected.dataStartIndex;
-    const mapping = detected.mapping;
+
+    // Support client-provided column mapping override
+    if (req.body?.column_mapping) {
+      try {
+        const custom = typeof req.body.column_mapping === 'string'
+          ? JSON.parse(req.body.column_mapping)
+          : req.body.column_mapping;
+        if (custom && typeof custom === 'object') {
+          mapping = { ...mapping, ...custom };
+        }
+      } catch (_) {}
+    }
 
     // Data rows start from detected dataStartIndex
     for (let i = dataStartIndex; i < rows.length; i++) {
@@ -566,6 +623,10 @@ router.post('/import', upload.single('file'), async (req, res) => {
       );
 
       if (existingClient.length > 0) {
+        if (duplicateHandling === 'skip') {
+          skippedClients++;
+          continue;
+        }
         clientId = existingClient[0].id;
         await execute(
           `UPDATE clients SET name = ?, phone = ?, address = ? WHERE id = ?`,
@@ -605,21 +666,23 @@ router.post('/import', upload.single('file'), async (req, res) => {
       }
 
       // Read day collections from extracted day entries
-      for (const entry of dayEntries) {
-        const d = entry.day;
-        const amount = entry.amount;
-        if (amount > 0 && d <= totalDays) {
-          const dayPadded = String(d).padStart(2, '0');
-          const colDate = `${month_year}-${dayPadded}`;
-          const collId = `coll_${cycleId}_d${d}`;
+      if (dayEntries && dayEntries.length > 0) {
+        for (const entry of dayEntries) {
+          const d = entry.day;
+          const amount = entry.amount;
+          if (amount > 0 && d <= totalDays) {
+            const dayPadded = String(d).padStart(2, '0');
+            const colDate = `${month_year}-${dayPadded}`;
+            const collId = `coll_${cycleId}_d${d}`;
 
-          collectionStatements.push({
-            sql: `INSERT INTO daily_collections (id, company_id, cycle_id, client_id, day_number, collection_date, amount, payment_mode, collected_by)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, 'cash', 'ExcelImport')
-                  ON CONFLICT(cycle_id, day_number) DO UPDATE SET amount = excluded.amount`,
-            args: [collId, companyId, cycleId, clientId, d, colDate, amount]
-          });
-          importedCollections++;
+            collectionStatements.push({
+              sql: `INSERT INTO daily_collections (id, company_id, cycle_id, client_id, day_number, collection_date, amount, payment_mode, collected_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'cash', 'ExcelImport')
+                    ON CONFLICT(cycle_id, day_number) DO UPDATE SET amount = excluded.amount`,
+              args: [collId, companyId, cycleId, clientId, d, colDate, amount]
+            });
+            importedCollections++;
+          }
         }
       }
     }

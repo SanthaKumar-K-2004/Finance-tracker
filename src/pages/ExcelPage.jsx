@@ -401,6 +401,20 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
   const [importError, setImportError] = useState('');
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
 
+  // Multi-Sheet & Universal Column Mapper State
+  const [selectedSheet, setSelectedSheet] = useState('');
+  const [columnMapping, setColumnMapping] = useState({
+    nameCol: -1,
+    phoneCol: -1,
+    villageCol: -1,
+    areaCol: -1,
+    addressCol: -1,
+    principalCol: -1,
+    slNoCol: -1,
+    dateCol: -1
+  });
+  const [duplicateHandling, setDuplicateHandling] = useState('update'); // 'update' | 'skip'
+
   // Import preview table filtering & pagination
   const [importSearch, setImportSearch] = useState('');
   const [importPage, setImportPage] = useState(1);
@@ -421,36 +435,50 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
     setImportError('');
     setImportSearch('');
     setImportPage(1);
+    setSelectedSheet('');
+    setColumnMapping({
+      nameCol: -1,
+      phoneCol: -1,
+      villageCol: -1,
+      areaCol: -1,
+      addressCol: -1,
+      principalCol: -1,
+      slNoCol: -1,
+      dateCol: -1
+    });
     const inputEl = document.getElementById('excel-file-picker');
     if (inputEl) inputEl.value = '';
   };
 
-  const handleFileSelected = async (selectedFile) => {
-    if (!selectedFile) return;
-
-    // Verify extension
-    const name = selectedFile.name.toLowerCase();
-    if (!name.endsWith('.xlsx') && !name.endsWith('.xls') && !name.endsWith('.csv')) {
-      setImportError(lang === 'ta' ? 'தயவுசெய்து சரியான .xlsx அல்லது .xls கோப்பை தேர்ந்தெடுக்கவும்' : 'Please select a valid Excel workbook (.xlsx or .xls)');
-      return;
-    }
-
-    setFile(selectedFile);
-    setImportError('');
-    setImportResult(null);
-    setImportPreviewData(null);
+  const fetchPreviewWithMapping = async (fileToPreview, sheetName = null, customMapping = null) => {
+    if (!fileToPreview) return;
     setValidating(true);
-    setImportPage(1);
+    setImportError('');
 
     const formData = new FormData();
-    formData.append('file', selectedFile);
+    formData.append('file', fileToPreview);
     formData.append('month_year', selectedMonth);
+    if (sheetName) {
+      formData.append('sheet_name', sheetName);
+    }
+    if (customMapping) {
+      formData.append('column_mapping', JSON.stringify(customMapping));
+    }
 
     try {
       const res = await fetch('/api/excel/preview', { method: 'POST', body: formData });
       const data = await res.json();
       if (data.success) {
         setImportPreviewData(data);
+        if (data.active_sheet) {
+          setSelectedSheet(data.active_sheet);
+        }
+        if (data.detected_mapping) {
+          setColumnMapping(prev => ({
+            ...prev,
+            ...data.detected_mapping
+          }));
+        }
         showToast(lang === 'ta' ? 'கோப்பு வெற்றிகரமாக சரிபார்க்கப்பட்டது!' : 'Workbook validated successfully!', 'success');
       } else {
         setImportError(data.error || 'Failed to preview Excel file');
@@ -459,6 +487,44 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
       setImportError(err.message || 'Validation request failed');
     } finally {
       setValidating(false);
+    }
+  };
+
+  const handleFileSelected = async (selectedFile) => {
+    if (!selectedFile) return;
+
+    // Verify extension
+    const name = selectedFile.name.toLowerCase();
+    if (!name.endsWith('.xlsx') && !name.endsWith('.xls') && !name.endsWith('.csv')) {
+      setImportError(lang === 'ta' ? 'தயவுசெய்து சரியான .xlsx, .xls அல்லது .csv கோப்பை தேர்ந்தெடுக்கவும்' : 'Please select a valid Excel or CSV workbook (.xlsx, .xls, .csv)');
+      return;
+    }
+
+    setFile(selectedFile);
+    setImportError('');
+    setImportResult(null);
+    setImportPreviewData(null);
+    setImportPage(1);
+
+    await fetchPreviewWithMapping(selectedFile, null, null);
+  };
+
+  const handleMappingChange = (fieldKey, colIndexStr) => {
+    const colIndex = parseInt(colIndexStr, 10);
+    const updated = {
+      ...columnMapping,
+      [fieldKey]: isNaN(colIndex) ? -1 : colIndex
+    };
+    setColumnMapping(updated);
+    if (file) {
+      fetchPreviewWithMapping(file, selectedSheet, updated);
+    }
+  };
+
+  const handleSheetChange = (newSheet) => {
+    setSelectedSheet(newSheet);
+    if (file) {
+      fetchPreviewWithMapping(file, newSheet, null);
     }
   };
 
@@ -471,6 +537,11 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('month_year', selectedMonth);
+    if (selectedSheet) {
+      formData.append('sheet_name', selectedSheet);
+    }
+    formData.append('column_mapping', JSON.stringify(columnMapping));
+    formData.append('duplicate_handling', duplicateHandling);
 
     try {
       const res = await fetch('/api/excel/import', { method: 'POST', body: formData });
@@ -1991,6 +2062,170 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                 </div>
               </div>
 
+              {/* Universal Smart Column Mapper Panel */}
+              <div style={{
+                padding: '16px',
+                background: 'var(--bg-app)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <SlidersHorizontal size={18} color="var(--indigo-primary)" />
+                    <div>
+                      <h4 style={{ fontSize: '14px', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                        {lang === 'ta' ? 'தானியங்கி நெடுவரிசை பொருத்தம் (Smart Column Mapper)' : 'Universal Smart Column Mapper'}
+                      </h4>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        {lang === 'ta'
+                          ? 'கண்டறியப்பட்ட நெடுவரிசை ஒதுக்கீடுகளை கீழே தேவைக்கேற்ப மாற்றலாம்.'
+                          : 'Auto-detected column roles. Re-assign or customize any column mapping below in real-time.'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Multi-Sheet Selector (if multiple sheets exist in workbook) */}
+                  {importPreviewData.sheet_names && importPreviewData.sheet_names.length > 1 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                        {lang === 'ta' ? 'பணித்தாள்:' : 'Worksheet:'}
+                      </span>
+                      <select
+                        value={selectedSheet}
+                        onChange={(e) => handleSheetChange(e.target.value)}
+                        className="input"
+                        style={{ height: '32px', fontSize: '12px', fontWeight: 700, minWidth: '150px' }}
+                      >
+                        {importPreviewData.sheet_names.map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* 8 Field Selectors Grid */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+                  gap: '10px'
+                }}>
+                  {[
+                    { key: 'nameCol', label: lang === 'ta' ? 'வாடிக்கையாளர் பெயர் *' : 'Borrower Name *', icon: User, required: true },
+                    { key: 'phoneCol', label: lang === 'ta' ? 'அலைபேசி எண்' : 'Mobile Phone Number', icon: Hash },
+                    { key: 'villageCol', label: lang === 'ta' ? 'கிராமம் / ஊர்' : 'Village / Town', icon: MapPin },
+                    { key: 'areaCol', label: lang === 'ta' ? 'பகுதி / வட்டாரம்' : 'Route Area / Ward', icon: MapPin },
+                    { key: 'addressCol', label: lang === 'ta' ? 'முழு முகவரி' : 'Street / Full Address', icon: FileText },
+                    { key: 'principalCol', label: lang === 'ta' ? 'அசல் கடன் தொகை' : 'Principal Loan Amount', icon: IndianRupee },
+                    { key: 'slNoCol', label: lang === 'ta' ? 'வரிசை எண் / குறியீடு' : 'Serial No / Client Code', icon: Hash },
+                    { key: 'dateCol', label: lang === 'ta' ? 'துவக்க தேதி' : 'Registration Date', icon: FileText }
+                  ].map(field => {
+                    const currentCol = columnMapping[field.key] !== undefined ? columnMapping[field.key] : -1;
+                    const isMatched = currentCol !== -1;
+                    const IconComp = field.icon;
+                    return (
+                      <div key={field.key} style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        padding: '8px 10px',
+                        background: 'var(--bg-surface)',
+                        borderRadius: 'var(--radius-sm)',
+                        border: isMatched ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid var(--border-subtle)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            <IconComp size={12} color="var(--indigo-primary)" />
+                            <span>{field.label}</span>
+                          </label>
+                          {isMatched && (
+                            <span style={{ fontSize: '9.5px', fontWeight: 800, color: '#166534', background: '#DCFCE7', padding: '1px 5px', borderRadius: '4px' }}>
+                              Matched ✓
+                            </span>
+                          )}
+                        </div>
+                        <select
+                          value={currentCol}
+                          onChange={(e) => handleMappingChange(field.key, e.target.value)}
+                          className="input"
+                          style={{
+                            height: '30px',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            borderColor: isMatched ? 'rgba(16, 185, 129, 0.4)' : 'var(--border-subtle)'
+                          }}
+                        >
+                          <option value="-1">{lang === 'ta' ? '-- தவிர்க்கவும் (Unmapped) --' : '-- Ignore / Unmapped --'}</option>
+                          {(importPreviewData.available_columns || []).map(c => {
+                            const sampleText = c.samples && c.samples.length > 0 ? ` (e.g. ${c.samples.slice(0, 2).join(', ')})` : '';
+                            return (
+                              <option key={c.index} value={c.index}>
+                                {c.header}{sampleText}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Policy & Auto-Detect Controls */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                  paddingTop: '4px',
+                  fontSize: '11.5px'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>
+                      {lang === 'ta' ? 'நகல் வாடிக்கையாளர் முறை:' : 'Duplicate Client Policy:'}
+                    </span>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="dupHandling"
+                        value="update"
+                        checked={duplicateHandling === 'update'}
+                        onChange={(e) => setDuplicateHandling(e.target.value)}
+                      />
+                      <span>{lang === 'ta' ? 'விவரங்களை புதுப்பி' : 'Update Profile'}</span>
+                    </label>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                      <input
+                        type="radio"
+                        name="dupHandling"
+                        value="skip"
+                        checked={duplicateHandling === 'skip'}
+                        onChange={(e) => setDuplicateHandling(e.target.value)}
+                      />
+                      <span>{lang === 'ta' ? 'தவிர் (Skip)' : 'Skip Existing'}</span>
+                    </label>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (file) {
+                        fetchPreviewWithMapping(file, selectedSheet, null);
+                      }
+                    }}
+                    className="btn btn-secondary btn-sm"
+                    style={{ height: '26px', fontSize: '11px', fontWeight: 700, gap: '4px' }}
+                    title={lang === 'ta' ? 'மீண்டும் தானாக கண்டறி' : 'Reset to auto-detect'}
+                  >
+                    <RotateCcw size={11} />
+                    <span>{lang === 'ta' ? 'தானாக கண்டறி (Auto-Detect)' : 'Reset to Auto-Detect'}</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Accidental Data Loss Safeguard Banner */}
               <div style={{
                 padding: '10px 14px',
@@ -2318,6 +2553,8 @@ function ActiveFilterTag({ label, onRemove }) {
       <button
         type="button"
         onClick={onRemove}
+        aria-label={`Remove filter ${label}`}
+        title={`Remove filter ${label}`}
         style={{
           background: 'transparent',
           border: 'none',

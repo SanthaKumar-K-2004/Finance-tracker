@@ -49,16 +49,24 @@ async function seed() {
     console.log(`🏢 Using existing company: ${existingCompanies[0].name} (${companyId})`);
   }
 
-  // Load Excel workbook
+  // Load Excel workbook if available; otherwise use default ALR borrower record
   const excelPath = path.resolve(__dirname, '../Daily_Collection_Register__ALR_-6.xlsx');
-  console.log(`📖 Loading Excel template from ${excelPath}...`);
-  const wb = XLSX.readFile(excelPath);
+  let rows = [];
 
-  // Parse May 2026 / Collection Register
-  const sheetName = wb.SheetNames[0]; // 'Collection Register'
-  console.log(`📑 Reading sheet: "${sheetName}"...`);
-  const sheet = wb.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  if (fs.existsSync(excelPath)) {
+    console.log(`📖 Loading Excel template from ${excelPath}...`);
+    const wb = XLSX.readFile(excelPath);
+    const sheetName = wb.SheetNames[0]; // 'Collection Register'
+    console.log(`📑 Reading sheet: "${sheetName}"...`);
+    const sheet = wb.Sheets[sheetName];
+    rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  } else {
+    console.log(`ℹ️ Excel template not found at ${excelPath}. Seeding default ALR borrower...`);
+    rows = [
+      [], [], [],
+      [3032, '02.05.2026', 'வெள்ளையம்மா w /o கரிகாலன்', '9585194934', 'அலங்காநல்லூர்', 10000, 100, 100, 100, 100, 100]
+    ];
+  }
 
   // Rows 1-3 are title, summary, and headers. Data starts from Row 4 (index 3)
   let importedCount = 0;

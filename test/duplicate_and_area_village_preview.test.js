@@ -14,6 +14,11 @@ const rootDir = path.resolve(__dirname, '..');
 const testFile = path.resolve(rootDir, 'Client_Test_Dataset_Duplicates_And_Area_Village.xlsx');
 
 test('Excel Parser & Duplicate Detection Test Suite', async (t) => {
+  // Ensure test fixtures exist on-demand (no need to track binary files in git)
+  if (!fs.existsSync(testFile)) {
+    const { generateDuplicateTestFiles } = await import('../scripts/generate_duplicate_test_excel.js');
+    generateDuplicateTestFiles();
+  }
 
   await t.test('1. Verify New Test File Exists & Contains Both Sets', () => {
     assert.strictEqual(fs.existsSync(testFile), true, 'Test workbook must exist');

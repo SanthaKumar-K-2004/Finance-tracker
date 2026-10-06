@@ -15,6 +15,11 @@ const set1File = path.resolve(rootDir, 'Client_Test_Set1_Corporate.xlsx');
 const set2File = path.resolve(rootDir, 'Client_Test_Set2_Field_Ops.xlsx');
 
 test('Client Dataset Excel Test Suite', async (t) => {
+  // Ensure test fixtures exist on-demand (no need to track binary files in git)
+  if (!fs.existsSync(masterFile) || !fs.existsSync(set1File) || !fs.existsSync(set2File)) {
+    const { generateAllExcelFiles } = await import('../scripts/generate_client_test_dataset.js');
+    generateAllExcelFiles();
+  }
 
   await t.test('1. Generated files exist on disk and have valid file sizes', () => {
     assert.strictEqual(fs.existsSync(masterFile), true, 'Master workbook should exist');
