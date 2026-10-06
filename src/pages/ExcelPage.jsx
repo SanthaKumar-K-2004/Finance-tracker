@@ -33,7 +33,8 @@ import {
   ArrowUpRight,
   Eye,
   MapPin,
-  IndianRupee
+  IndianRupee,
+  ShieldCheck
 } from 'lucide-react';
 import ExportPreviewTable from '../components/ExportPreviewTable';
 import { downloadRegisterPdf, downloadMemberHistoryPdf } from '../utils/pdfExport';
@@ -88,29 +89,17 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
 
-  // Cached distinct villages for active month (stable options list)
+  // Cached distinct villages for active month (stable options list — set once per month, never mutated by filter changes)
   const [monthVillages, setMonthVillages] = useState([]);
+  const monthVillagesRef = React.useRef([]);
 
   useEffect(() => {
     setMonthVillages([]);
+    monthVillagesRef.current = [];
   }, [selectedMonth]);
 
-  // Auto-adopting distinct villages & areas from current previewData (stable across filter changes)
-  const availableVillages = useMemo(() => {
-    if (monthVillages.length > 0) return monthVillages;
-    if (Array.isArray(previewData?.villages) && previewData.villages.length > 0) {
-      return previewData.villages;
-    }
-    if (Array.isArray(previewData?.rows) && previewData.rows.length > 0) {
-      const counts = {};
-      previewData.rows.forEach(r => {
-        const v = (r.address || '').trim();
-        if (v) counts[v] = (counts[v] || 0) + 1;
-      });
-      return Object.keys(counts).sort((a, b) => a.localeCompare(b)).map(name => ({ name, count: counts[name] }));
-    }
-    return [];
-  }, [monthVillages, previewData?.villages, previewData?.rows]);
+  // Stable village list — only depends on monthVillages state (never on transient previewData)
+  const availableVillages = useMemo(() => monthVillages, [monthVillages]);
 
   // Check if any non-default filter is currently active
   const hasActiveFilters = Boolean(
@@ -136,6 +125,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
     setMaxPrincipal('');
     setSortBy('sl_no');
     setSortOrder('asc');
+    monthVillagesRef.current = [];
     showToast(lang === 'ta' ? 'அனைத்து வடிகட்டிகளும் மீட்டமைக்கப்பட்டன' : 'All filters reset to default', 'info');
   };
 
@@ -169,8 +159,10 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
       const data = await res.json();
       if (data.success) {
         setPreviewData(data);
-        if (Array.isArray(data.villages) && data.villages.length > 0) {
-          setMonthVillages(prev => (prev.length === 0 ? data.villages : prev));
+        // Populate village list exactly once per month — prevents dropdown re-render during user interaction
+        if (Array.isArray(data.villages) && data.villages.length > 0 && monthVillagesRef.current.length === 0) {
+          monthVillagesRef.current = data.villages;
+          setMonthVillages(data.villages);
         }
       } else {
         setPreviewError(data.error || 'Failed to fetch export preview');
@@ -194,6 +186,16 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
       return () => clearTimeout(timer);
     }
   }, [activeTab, fetchExportPreview]);
+
+  // Cleanup AbortController on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
 
   // Quick Serial Number Range Buttons
   const handleSetSlRange = (from, to) => {
@@ -674,7 +676,10 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                 )}
                 <button
                   type="button"
-                  onClick={fetchExportPreview}
+                  onClick={() => {
+                    monthVillagesRef.current = [];
+                    fetchExportPreview();
+                  }}
                   className="btn btn-secondary btn-sm"
                   style={{ height: '32px', gap: '6px', fontSize: '12px', fontWeight: 700 }}
                   disabled={previewLoading}
@@ -689,10 +694,11 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
               {/* Status Filter */}
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                <label htmlFor="filter-loan-status" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
                   {lang === 'ta' ? 'கடன் நிலை (Status)' : 'Loan Status'}
                 </label>
                 <select
+                  id="filter-loan-status"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   className="input"
@@ -714,11 +720,12 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
 
               {/* Serial Number / Client Code Range */}
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                <label htmlFor="filter-from-sl" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
                   {lang === 'ta' ? 'எண் / குறியீடு வரம்பு (Sl # / Code Range)' : 'Serial # / Client Code Range (From - To)'}
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <input
+                    id="filter-from-sl"
                     type="text"
                     placeholder={lang === 'ta' ? 'முதல் (எ.கா. 1, snop01)' : 'From (e.g. 1 or snop01)'}
                     value={fromSlNo}
@@ -728,6 +735,8 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                   />
                   <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 700 }}>-</span>
                   <input
+                    id="filter-to-sl"
+                    aria-label="To Serial No or Client Code"
                     type="text"
                     placeholder={lang === 'ta' ? 'வரை (எ.கா. 50, snop65d)' : 'To (e.g. 50 or snop65d)'}
                     value={toSlNo}
@@ -741,7 +750,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
               {/* Village / Area Filter (Auto-Adopting Dropdown with count & clear) */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  <label htmlFor="filter-village-area" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)' }}>
                     <MapPin size={12} style={{ color: 'var(--indigo-primary)' }} />
                     <span>{lang === 'ta' ? 'ஊர் / பகுதி (Village / Area)' : 'Village / Route Area'}</span>
                   </label>
@@ -778,6 +787,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                   </div>
                 </div>
                 <select
+                  id="filter-village-area"
                   value={villageFilter}
                   onChange={(e) => setVillageFilter(e.target.value)}
                   className="input"
@@ -810,10 +820,11 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
 
               {/* Search Borrower */}
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                <label htmlFor="filter-search-query" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
                   {lang === 'ta' ? 'தேடுக (Name/Phone/Code)' : 'Search Name / Phone / Code'}
                 </label>
                 <input
+                  id="filter-search-query"
                   type="text"
                   placeholder={lang === 'ta' ? 'பெயர், தொலைபேசி அல்லது குறியீடு...' : 'Search name, phone, or code...'}
                   value={searchQuery}
@@ -825,11 +836,12 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
 
               {/* Principal Range */}
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                <label htmlFor="filter-min-principal" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
                   {lang === 'ta' ? 'அசல் தொகை வரம்பு (Principal ₹)' : 'Principal Range (Min - Max ₹)'}
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <input
+                    id="filter-min-principal"
                     type="number"
                     placeholder="Min ₹"
                     value={minPrincipal}
@@ -839,6 +851,8 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                   />
                   <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>-</span>
                   <input
+                    id="filter-max-principal"
+                    aria-label="Maximum Principal"
                     type="number"
                     placeholder="Max ₹"
                     value={maxPrincipal}
@@ -851,11 +865,12 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
 
               {/* Sorting & Format */}
               <div>
-                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                <label htmlFor="filter-sort-by" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
                   {lang === 'ta' ? 'வரிசைப்படுத்துதல் & பார்வை' : 'Sort By & Format'}
                 </label>
                 <div style={{ display: 'flex', gap: '6px' }}>
                   <select
+                    id="filter-sort-by"
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                     className="input"
@@ -868,6 +883,8 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                     <option value="collection_rate">{lang === 'ta' ? 'வசூல் விகிதம் (Recovery %)' : 'Recovery Rate (%)'}</option>
                   </select>
                   <select
+                    id="filter-sort-order"
+                    aria-label="Sort Direction"
                     value={sortOrder}
                     onChange={(e) => setSortOrder(e.target.value)}
                     className="input"
@@ -908,15 +925,9 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                   active={statusFilter === 'partial'}
                   onClick={() => setStatusFilter(statusFilter === 'partial' ? 'all' : 'partial')}
                 />
-                <PresetChip
-                  label="snop65d"
-                  active={fromSlNo === 'snop65d' || toSlNo === 'snop65d' || searchQuery === 'snop65d'}
-                  onClick={() => {
-                    setFromSlNo('snop65d');
-                    setToSlNo('snop65d');
-                    setStatusFilter('all');
-                  }}
-                />
+                <PresetChip label="101 - 150" active={fromSlNo === '101' && toSlNo === '150'} onClick={() => handleSetSlRange(101, 150)} />
+                <PresetChip label="151 - 200" active={fromSlNo === '151' && toSlNo === '200'} onClick={() => handleSetSlRange(151, 200)} />
+                <PresetChip label="201 - 300" active={fromSlNo === '201' && toSlNo === '300'} onClick={() => handleSetSlRange(201, 300)} />
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1537,31 +1548,152 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
       )}
 
       {/* ================================================================== */}
+      {/* ================================================================== */}
       {/* TAB 4: IMPORT REGISTER & BLANK TEMPLATE                            */}
       {/* ================================================================== */}
       {activeTab === 'import' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-          {/* Top Cards: Blank Template & File Upload */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-            {/* Card 1: Blank Template */}
-            <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', borderTop: '3px solid var(--amber-primary)', boxShadow: 'var(--shadow-sm)' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <FileText size={20} color="var(--amber-primary)" />
-                  <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
-                    {lang === 'ta' ? 'வெற்று டெம்ப்ளேட் (Download Template)' : 'Download Blank Template'}
-                  </h3>
+          {/* 3-Step Guided Workflow Roadmap */}
+          <div className="card" style={{
+            padding: '16px 20px',
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.04), rgba(16,185,129,0.04))',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-lg)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '14px' }}>
+              {/* Step 1 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 200px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'var(--amber-primary)',
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 4px rgba(245, 158, 11, 0.3)'
+                }}>
+                  1
                 </div>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    {lang === 'ta' ? 'டெம்ப்ளேட் பதிவிறக்கம்' : '1. Download Blank Template'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {lang === 'ta' ? `${monthDays} நாள் அட்டவணை & சூத்திரங்கள்` : `${monthDays}-Day pre-formatted grid with formulas`}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 200px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'var(--indigo-primary)',
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 4px rgba(99, 102, 241, 0.3)'
+                }}>
+                  2
+                </div>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    {lang === 'ta' ? 'விவரங்களை நிரப்புதல்' : '2. Fill Data Offline'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {lang === 'ta' ? 'Excel அல்லது Google Sheets-ல்' : 'Fill borrowers & collections in Excel/Sheets'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 200px' }}>
+                <div style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  background: 'var(--emerald-primary)',
+                  color: '#FFFFFF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  flexShrink: 0,
+                  boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
+                }}>
+                  3
+                </div>
+                <div>
+                  <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    {lang === 'ta' ? 'பதிவேற்றி சரிபார்த்தல்' : '3. Drag & Drop to Verify'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {lang === 'ta' ? 'தானியங்கி சரிபார்ப்பு & நேரலை முன்னோட்டம்' : 'Instant phone check & live preview'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Top Cards: Blank Template & File Upload (Stage 1: Hidden during active review deck) */}
+          {!importPreviewData && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+            {/* Card 1: Blank Template */}
+            <div className="card" style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: '14px',
+              border: '1px solid var(--border-subtle)',
+              borderTop: '3px solid var(--amber-primary)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-sm)'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    background: 'rgba(245, 158, 11, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--amber-primary)'
+                  }}>
+                    <FileSpreadsheet size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                      {lang === 'ta' ? 'வெற்று டெம்ப்ளேட் பதிவிறக்கம்' : 'Download Pre-Formatted Register'}
+                    </h3>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {selectedMonth} ({monthDays} {lang === 'ta' ? 'நாட்கள்' : 'Days Grid'})
+                    </div>
+                  </div>
+                </div>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '8px 0 12px' }}>
                   {lang === 'ta'
                     ? `புதிய மாதத்திற்கு (${selectedMonth}) பயன்படுத்த முன்-வடிவமைக்கப்பட்ட வெற்று .xlsx கோப்பு. தலைப்புகள், நாள் 1-${monthDays} நெடுவரிசைகள் மற்றும் நேரலை எக்செல் சூத்திரங்கள் தயாராக உள்ளன.`
-                    : `Pre-formatted blank .xlsx with ALR register headers, Days 1-${monthDays} columns, dynamic Excel formulas, and sample borrower row.`}
+                    : `Official ALR Daily Collection Register format with pre-built Days 1-${monthDays} columns, auto-sum recovery formulas, and borrower serial indexing.`}
                 </p>
-                <div style={{ marginTop: '10px', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  <span className="badge badge-amber" style={{ fontSize: '11px' }}>{monthDays} Days Grid</span>
-                  <span className="badge badge-amber" style={{ fontSize: '11px' }}>Live =SUM & =IF</span>
-                  <span className="badge badge-amber" style={{ fontSize: '11px' }}>Zero Formulas Error</span>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  <span className="badge badge-amber" style={{ fontSize: '10.5px' }}>{monthDays} Days Columns</span>
+                  <span className="badge badge-amber" style={{ fontSize: '10.5px' }}>Live =SUM & =IF</span>
+                  <span className="badge badge-amber" style={{ fontSize: '10.5px' }}>Zero Formula Errors</span>
                 </div>
               </div>
 
@@ -1570,45 +1702,79 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                 onClick={handleDownloadTemplate}
                 disabled={downloadingTemplate}
                 className="btn btn-secondary"
-                style={{ width: '100%', height: '42px', borderColor: 'var(--amber-primary)', color: 'var(--amber-text)', fontWeight: 800 }}
+                style={{
+                  width: '100%',
+                  height: '42px',
+                  borderColor: 'var(--amber-primary)',
+                  color: 'var(--amber-text)',
+                  fontWeight: 800,
+                  fontSize: '13px',
+                  gap: '8px',
+                  borderRadius: 'var(--radius-md)'
+                }}
               >
                 {downloadingTemplate ? <RefreshCw size={16} className="spin" /> : <Download size={16} color="var(--amber-primary)" />}
-                <span>{downloadingTemplate ? (lang === 'ta' ? 'பதிவிறக்குகிறது...' : 'Downloading...') : (lang === 'ta' ? 'டெம்ப்ளேட் பதிவிறக்கம் (.xlsx)' : 'Download Template (.xlsx)')}</span>
+                <span>{downloadingTemplate ? (lang === 'ta' ? 'பதிவிறக்குகிறது...' : 'Generating Template...') : (lang === 'ta' ? 'டெம்ப்ளேட் பதிவிறக்கம் (.xlsx)' : 'Download Blank Register (.xlsx)')}</span>
               </button>
             </div>
 
             {/* Card 2: Upload Dropzone */}
-            <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '14px', borderTop: '3px solid var(--emerald-primary)', boxShadow: 'var(--shadow-sm)' }}>
+            <div className="card" style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              gap: '14px',
+              border: '1px solid var(--border-subtle)',
+              borderTop: '3px solid var(--emerald-primary)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: 'var(--shadow-sm)'
+            }}>
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <Upload size={20} color="var(--emerald-primary)" />
-                  <h3 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>
-                    {lang === 'ta' ? 'எக்செல் பதிவேற்றம் (Drag & Drop)' : 'Drag & Drop Register (.xlsx)'}
-                  </h3>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <div style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--emerald-primary)'
+                  }}>
+                    <Upload size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: 800, margin: 0, color: 'var(--text-primary)' }}>
+                      {lang === 'ta' ? 'எக்செல் பதிவேற்றம் & சரிபார்ப்பு' : 'Upload Completed Register'}
+                    </h3>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      {lang === 'ta' ? 'பாதுகாப்பான இறக்குமதி' : 'Safe Non-Destructive Ingestion'}
+                    </div>
+                  </div>
                 </div>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '8px 0 12px' }}>
                   {lang === 'ta'
                     ? 'ஆஃப்லைனில் நீங்கள் பூர்த்தி செய்த ALR எக்செல் கோப்பை இங்கு இழுத்து விடுங்கள். நெடுவரிசைகள் மற்றும் நகல் போன் எண்கள் சரிபார்க்கப்பட்டு மாதிரிக் காட்சி காட்டப்படும்.'
-                    : 'Drop your completed ALR register here. Validates columns, flags duplicate phone numbers, and displays an interactive preview.'}
+                    : 'Drop your completed register here. Validates columns, flags duplicate phone numbers, calculates days collected, and displays a safety preview before saving.'}
                 </p>
               </div>
 
               {/* If file is selected, show file card */}
               {file ? (
                 <div style={{
-                  padding: '14px 16px',
+                  padding: '12px 14px',
                   borderRadius: 'var(--radius-md)',
-                  background: 'var(--emerald-light, rgba(16,185,129,0.08))',
-                  border: '1px solid rgba(16,185,129,0.3)',
+                  background: 'rgba(16, 185, 129, 0.08)',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: '12px'
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <FileSpreadsheet size={24} color="var(--emerald-primary)" />
-                    <div>
-                      <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--text-primary)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
+                    <FileSpreadsheet size={22} color="var(--emerald-primary)" style={{ flexShrink: 0 }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 800, fontSize: '13px', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {file.name}
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -1620,7 +1786,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                     type="button"
                     onClick={resetFileInput}
                     className="btn btn-secondary btn-sm"
-                    style={{ height: '30px', padding: '0 8px', fontSize: '11px', fontWeight: 700 }}
+                    style={{ height: '30px', padding: '0 8px', fontSize: '11px', fontWeight: 700, flexShrink: 0 }}
                   >
                     <X size={13} />
                     <span>{lang === 'ta' ? 'நீக்கு' : 'Remove'}</span>
@@ -1637,7 +1803,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                   }}
                   style={{
                     border: isDragging ? '2px dashed var(--emerald-primary)' : '2px dashed var(--border-strong)',
-                    background: isDragging ? 'var(--emerald-light, rgba(16,185,129,0.1))' : 'var(--bg-surface-hover)',
+                    background: isDragging ? 'rgba(16, 185, 129, 0.12)' : 'var(--bg-surface-hover)',
                     borderRadius: 'var(--radius-md)',
                     padding: '20px 14px',
                     textAlign: 'center',
@@ -1646,12 +1812,14 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                   }}
                   onClick={() => document.getElementById('excel-file-picker')?.click()}
                 >
-                  <Upload size={26} color="var(--emerald-primary)" style={{ margin: '0 auto 6px' }} />
+                  <Upload size={28} color="var(--emerald-primary)" style={{ margin: '0 auto 6px' }} />
                   <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>
                     {lang === 'ta' ? 'கோப்பை இங்கு இழுத்து விடவும் அல்லது கிளிக் செய்யவும்' : 'Drag & drop .xlsx file here, or click to browse'}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>
-                    .xlsx, .xls (Daily Collection Register ALR)
+                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                    <span style={{ background: 'rgba(0,0,0,0.05)', padding: '1px 5px', borderRadius: '3px' }}>.xlsx</span>
+                    <span style={{ background: 'rgba(0,0,0,0.05)', padding: '1px 5px', borderRadius: '3px' }}>.xls</span>
+                    <span style={{ background: 'rgba(0,0,0,0.05)', padding: '1px 5px', borderRadius: '3px' }}>.csv</span>
                   </div>
                 </div>
               )}
@@ -1667,6 +1835,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
               />
             </div>
           </div>
+          )}
 
           {/* Validating Spinner Indicator */}
           {validating && (
@@ -1819,6 +1988,29 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                     {uploading ? <RefreshCw size={15} className="spin" /> : <Upload size={15} />}
                     <span>{uploading ? (lang === 'ta' ? 'இறக்குமதி செய்யப்படுகிறது...' : 'Importing...') : (lang === 'ta' ? `சேமி (${importPreviewData.summary?.valid_rows || 0} வாடிக்கையாளர்கள்)` : `Confirm Import (${importPreviewData.summary?.valid_rows || 0} Rows)`)}</span>
                   </button>
+                </div>
+              </div>
+
+              {/* Accidental Data Loss Safeguard Banner */}
+              <div style={{
+                padding: '10px 14px',
+                borderRadius: 'var(--radius-md)',
+                background: 'rgba(59, 130, 246, 0.08)',
+                border: '1px solid rgba(59, 130, 246, 0.25)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                fontSize: '12px',
+                color: 'var(--text-secondary)'
+              }}>
+                <ShieldCheck size={18} color="#2563EB" style={{ flexShrink: 0 }} />
+                <div>
+                  <strong style={{ color: 'var(--text-primary)' }}>
+                    {lang === 'ta' ? 'பாதுகாப்பான தரவு இறக்குமதி:' : 'Non-Destructive Safe Ingestion:'}
+                  </strong>{' '}
+                  {lang === 'ta'
+                    ? 'ஏற்கனவே உள்ள வாடிக்கையாளர் விவரங்கள் புதுப்பிக்கப்படும். முந்தைய மாத அல்லது மற்ற நாள் வசூல்கள் அழியாது.'
+                    : 'Matching borrower details will be updated non-destructively. Historical records and other cycle collections will never be overwritten or deleted.'}
                 </div>
               </div>
 

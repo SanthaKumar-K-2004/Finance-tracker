@@ -130,6 +130,9 @@ export function cleanPdfText(text) {
   if (!text) return '-';
   let str = String(text).trim();
 
+  // Normalize Unicode dashes and Rupee symbol
+  str = str.replace(/[\u2013\u2014]/g, '-').replace(/\u20B9\s*/g, 'Rs. ');
+
   // If format "Tamil (English)", extract English
   const parenMatch = str.match(/\(([^)]+)\)/);
   if (parenMatch) {
@@ -382,7 +385,7 @@ export function downloadRegisterPdf({
     bodyRows.push([
       '#',
       `TOTALS (${rows.length} BORROWERS)`,
-      `${rows.length} Active`,
+      '-',
       'ALL AREAS',
       formatNumber(grandPrincipal),
       formatNumber(grandCollected),
@@ -408,24 +411,26 @@ export function downloadRegisterPdf({
     );
     headCols = [headerRow];
 
-    // Total width 269mm: fixed cols: 9 + 32 + 15 + 16 + 16 + 16 = 104mm. Remaining 165mm for days.
-    const dayWidth = (pageWidth - 28 - 9 - 32 - 15 - 16 - 16 - 16) / totalDays;
+    // Total width 269mm: margins: 14+14=28. Usable: 269mm. Fixed cols: Sl(8) + Name(30) + Principal(14) + Collected(15) + Remaining(15) + Status(14) = 96mm. Remaining for days.
+    const fixedWidth = 8 + 30 + 14 + 15 + 15 + 14; // 96mm
+    const usableWidth = pageWidth - 28; // 269mm
+    const dayWidth = Math.max(3.5, (usableWidth - fixedWidth) / totalDays);
     colStyles = {
-      0: { halign: 'center', cellWidth: 9 },
-      1: { halign: 'left', cellWidth: 32, fontStyle: 'bold' },
-      2: { halign: 'right', cellWidth: 15 }
+      0: { halign: 'center', cellWidth: 8, fontSize: 6.5 },
+      1: { halign: 'left', cellWidth: 30, fontStyle: 'bold', fontSize: 6.5, overflow: 'ellipsize' },
+      2: { halign: 'right', cellWidth: 14, fontSize: 6.5 }
     };
     for (let d = 1; d <= totalDays; d++) {
       colStyles[2 + d] = {
         halign: 'center',
         cellWidth: dayWidth,
-        cellPadding: { top: 1.2, right: 0.2, bottom: 1.2, left: 0.2 },
-        fontSize: 6.2
+        cellPadding: { top: 1, right: 0.3, bottom: 1, left: 0.3 },
+        fontSize: 5.8
       };
     }
-    colStyles[3 + totalDays] = { halign: 'right', cellWidth: 16, fontStyle: 'bold', textColor: [22, 101, 52] };
-    colStyles[4 + totalDays] = { halign: 'right', cellWidth: 16, fontStyle: 'bold' };
-    colStyles[5 + totalDays] = { halign: 'center', cellWidth: 16 };
+    colStyles[3 + totalDays] = { halign: 'right', cellWidth: 15, fontStyle: 'bold', textColor: [22, 101, 52], fontSize: 6.5 };
+    colStyles[4 + totalDays] = { halign: 'right', cellWidth: 15, fontStyle: 'bold', fontSize: 6.5 };
+    colStyles[5 + totalDays] = { halign: 'center', cellWidth: 14, fontSize: 6.5 };
 
     bodyRows = rows.map((r, idx) => {
       const slDisplay = r.client_code ? `${r.sl_no || idx + 1}\n(${r.client_code})` : (r.sl_no || idx + 1);
@@ -474,7 +479,7 @@ export function downloadRegisterPdf({
       cellPadding: showDays ? 1.4 : 2,
       lineColor: [203, 213, 225], // Slate 200 borders
       lineWidth: 0.2,
-      overflow: 'linebreak'
+      overflow: showDays ? 'ellipsize' : 'linebreak'
     },
     alternateRowStyles: {
       fillColor: [248, 250, 252] // Slate 50 subtle zebra

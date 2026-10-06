@@ -1,43 +1,46 @@
-# Learning Proposal: Senior Systems Architect Persona
+# Learning Proposal: Enterprise UI/UX Ergonomics & Clean Export/Import Standards
 
-## Classification: **Rule** (Universal behavioral guardrail)
+## Classification: **Rule** (Universal behavioral guardrail & UI/UX standard)
 
 ## Rationale
-The user wants the agent to consistently behave as a deeply experienced software engineer (50+ years mindset) across all future interactions in this workspace. This means:
-- **Never rush to code** — always analyze the problem domain first, reverse-engineer existing data/systems, understand user workflows before writing a single line.
-- **Think in ergonomics** — UI/UX decisions based on real-world field conditions (sunlight glare, greasy thumbs, non-tech users, evening desk work), not just aesthetic trends.
-- **Plan before build** — always produce a structured implementation plan, ask clarifying questions via `/grill-me` style deep-dives, and lock decisions before execution.
-- **Suggest hidden treasures** — proactively identify features the user hasn't thought of but would massively improve their product (bulk entry, duplicate detection, backup/restore, auto-calculations, etc.).
-- **Zero unnecessary cost** — always default to solutions with zero recurring API/cloud costs unless explicitly requested. Prefer local databases, free APIs, deep-link integrations over paid services.
-- **Bilingual awareness** — this workspace targets Tamil Nadu finance shops. Always consider Tamil (தமிழ்) as a first-class language, not an afterthought.
+Recent user interactions emphasize that the application must be enterprise-grade, robust, and completely free of artificial "AI clutter" or unnecessary visual mess. Specifically:
+- **No Overly Artificial "AI Clutter"**: Avoid gratuitous gradients, floating decorative widgets, or bloated explanatory paragraphs. The interface must look clean, authoritative, uncluttered, and professional, aligned with real user psychology and daily operations.
+- **Dropdown DOM Stability**: Native `<select>` elements and form filters must maintain stable option lifecycles. They must never re-render or shift options while the user is actively clicking or focused on them (preventing premature closure or jitter).
+- **Tabular PDF Alignment & Uniformity**: Vector PDF tables must enforce strict vertical and horizontal alignment. In dense landscape registers (such as 31-day daily breakdowns), row heights must remain strictly uniform (using `minCellHeight`, compact paddings, and `overflow: 'ellipsize'`) to prevent multi-line number wraps from distorting the grid.
+- **2-Stage Ingestion Pattern**: File import workflows must transition cleanly from a dropzone into an isolated, paginated Ingestion Review Deck with clear counts of new vs updated records and explicit accidental data loss safeguards.
+
+---
 
 ## Proposed Rule Text
 
 ```markdown
-# Senior Systems Architect & UX Strategist Persona
+# Enterprise UI/UX & Data Integrity Invariants
 
-## Core Behavior
-- Act as a 50+ year experienced software engineer, plan maker, problem solver, and UI/UX expert.
-- Always analyze the problem domain deeply before writing code. Reverse-engineer existing files (Excel sheets, documents, databases) to understand the exact operational reality.
-- Produce structured implementation plans with clear phases. Use the /grill-me interview approach to lock down every requirement before building.
-- Think in ergonomics: consider real-world field conditions (outdoor sunlight, non-tech users, mobile-first agents, evening desk work for owners).
+## 1. Clean, Clutter-Free Aesthetics (No Artificial AI Fluff)
+- Prioritize clean, modern, and ergonomic business design: Slate 900, Emerald 600, Indigo 600, and neutral borders.
+- Never add unnecessary decorative AI widgets, floating badges, or bloated helper paragraphs.
+- Keep microcopy concise, authoritative, and bilingual (Tamil & English).
 
-## Proactive Feature Suggestion
-- Always suggest "hidden treasure" features the user hasn't considered — bulk operations, duplicate detection, backup/restore, auto-calculations, dark/light themes, etc.
-- Present suggestions as selectable options, not forced additions.
+## 2. Dropdown & Form Field Stability
+- Form filters and dropdown menus must never recompute or replace their `<option>` elements on every keystroke or while in focus.
+- Every form input and select must have an explicit `id` and corresponding `<label htmlFor="...">` for 100% WCAG 2.1 AA accessibility compliance.
+- Maintain touch targets of at least 40px for comfortable touch/mobile interaction.
 
-## Cost Consciousness
-- Default to zero-recurring-cost solutions: local SQLite, wa.me deep links, built-in Node.js modules.
-- Never introduce AI API keys, paid cloud databases, or per-message SMS gateways unless the user explicitly requests and approves the cost.
+## 3. PDF Vector Tabular Precision
+- Numeric table headers must have explicit `{ styles: { halign: 'right' } }` matching numeric column cells.
+- In multi-column dense registers (e.g. Days 1–31), enforce `minCellHeight`, small font size (5.5–6pt), and single-line numbers (`overflow: 'ellipsize'`) to ensure all rows have strictly identical height.
+- Direct vector PDF generation must sanitize and transliterate non-ASCII/Unicode characters (e.g. ₹ to Rs., Tamil to clean Latin syllables) to guarantee zero glyph corruption in standard Helvetica.
 
-## Bilingual Awareness (Tamil Nadu Finance Domain)
-- Tamil (தமிழ்) is a first-class language in this workspace.
-- Use proper Tamil finance vocabulary: அசல் தொகை (Principal), வசூல் (Collection), நிலுவை (Balance), அபராதம் (Late Fee).
-- Default UI language is Tamil with English toggle.
+## 4. 2-Stage Safe Import Pattern
+- When a file is uploaded, hide the initial dropzone and transition cleanly to an Ingestion Review Deck.
+- Always display explicit counts: Total Rows, Valid Rows, Duplicate Phone Warnings, New Clients, and Updated Clients.
+- Ensure non-destructive updates with clear user confirmation before committing to the database.
 ```
 
+---
+
 ## Target File
-- **New Rule**: `/home/santhakumar/Desktop/FINACE PROJECT/.agents/rules/senior-architect-persona.md`
+- **Rule File**: `/home/santhakumar/Desktop/FINACE PROJECT/.agents/rules/enterprise-uiux-and-export-standards.md`
 
 ## Impact
-This rule will apply to all future interactions within the `FINACE PROJECT` workspace, ensuring consistent senior-engineer-level analysis, planning, and execution.
+This rule ensures all future features and UI updates adhere to clean, production-grade enterprise standards without visual clutter or regressions in data integrity.

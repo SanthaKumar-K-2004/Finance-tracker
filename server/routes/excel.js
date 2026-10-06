@@ -9,6 +9,7 @@ import { serverCache } from '../utils/cache.js';
 import { parseCurrencyNumber } from '../utils/currency.js';
 import { sanitizeMonthYear } from '../utils/date.js';
 import { matchesIdentifierRange, cleanIdentifier } from '../utils/identifierFilter.js';
+import { detectHeaderAndColumns, extractClientRowData } from '../utils/excelParser.js';
 
 const router = Router();
 const XLSX = xlsx.default || xlsx;
@@ -360,20 +361,26 @@ router.post('/preview', upload.single('file'), async (req, res) => {
     const mNum = parseInt(mStr, 10);
     const totalDays = (yNum && mNum) ? new Date(yNum, mNum, 0).getDate() : 31;
 
-    // Existing clients from DB to check for duplicate phone numbers
+    // Existing clients from DB to check for duplicate phone numbers and matching clients
     const dbClients = await query(
       "SELECT id, sl_no, name, phone FROM clients WHERE company_id = ? AND status != 'deleted'",
       [companyId]
     );
     const dbPhoneMap = new Map();
+    const dbNameMap = new Map();
     dbClients.forEach(c => {
       if (c.phone) {
         const clean = String(c.phone).replace(/[^0-9]/g, '');
         if (clean) dbPhoneMap.set(clean, c);
       }
+      if (c.name) {
+        const cleanName = c.name.toLowerCase().trim();
+        if (cleanName) dbNameMap.set(cleanName, c);
+      }
     });
 
     const seenSheetPhones = new Map();
+    const seenSheetNames = new Map();
     const warnings = [];
     const previewRows = [];
     let totalPrincipal = 0;
@@ -381,20 +388,26 @@ router.post('/preview', upload.single('file'), async (req, res) => {
     let validRows = 0;
     let duplicatePhonesCount = 0;
 
-    // Data starts at row index 3 (Row 4 in Excel)
-    for (let i = 3; i < rows.length; i++) {
+    // Detect column positions dynamically (Area, Village, Address, Name, Phone, Principal)
+    const detected = detectHeaderAndColumns(rows);
+    const dataStartIndex = detected.dataStartIndex;
+    const mapping = detected.mapping;
+
+    // Data rows start from detected dataStartIndex
+    for (let i = dataStartIndex; i < rows.length; i++) {
       const row = rows[i];
       if (!row || !Array.isArray(row)) continue;
 
-      const slNo = row[0] ? parseInt(row[0], 10) : i - 2;
-      const date = row[1] ? String(row[1]).trim() : '';
-      const name = row[2] ? String(row[2]).trim() : '';
-      const phone = row[3] ? String(row[3]).trim().replace(/[^0-9]/g, '') : '';
-      const address = row[4] ? String(row[4]).trim() : '';
-      const principal = parseCurrencyNumber(row[5], 0);
+      const extracted = extractClientRowData(row, mapping, i - dataStartIndex + 1, totalDays);
+      if (!extracted) continue;
 
-      // Skip completely empty rows
-      if (!name && !phone && principal === 0) continue;
+      const { slNo, date, name, phone, address, principal, dayEntries, collectionSum } = extracted;
+
+      // Skip empty or summary/totals footer rows
+      if (!name && !phone) continue;
+      const firstCell = String(row[0] || '').trim().toLowerCase();
+      if (/^(total|totals|summary|grand\s*total|மொத்தம்|கூடுதல்)/i.test(firstCell)) continue;
+      if (/^(total|totals|summary|grand\s*total|மொத்தம்|கூடுதல்)/i.test(name.toLowerCase())) continue;
 
       const rowIssues = [];
       let status = 'valid';
@@ -402,6 +415,24 @@ router.post('/preview', upload.single('file'), async (req, res) => {
       if (!name) {
         rowIssues.push('Missing Name (பெயர் இல்லை)');
         status = 'invalid';
+      }
+
+      // Check duplicate or matching name
+      if (name) {
+        const cleanName = name.toLowerCase().trim();
+        if (seenSheetNames.has(cleanName)) {
+          const prevRow = seenSheetNames.get(cleanName);
+          rowIssues.push(`Duplicate name in sheet with row ${prevRow} (${name})`);
+          if (status !== 'invalid') status = 'warning';
+        } else {
+          seenSheetNames.set(cleanName, i + 1);
+        }
+
+        if (dbNameMap.has(cleanName)) {
+          const match = dbNameMap.get(cleanName);
+          rowIssues.push(`Existing client in DB: ${match.name} (Sl ${match.sl_no})`);
+          if (status !== 'invalid') status = 'warning';
+        }
       }
 
       // Check phone duplicates
@@ -423,23 +454,9 @@ router.post('/preview', upload.single('file'), async (req, res) => {
         }
       }
 
-      // Sum collections for actual days of this month (1..totalDays)
-      let rowCollectionSum = 0;
-      const dayEntries = [];
-      for (let d = 1; d <= totalDays; d++) {
-        const val = row[5 + d];
-        if (val !== undefined && val !== '' && val !== null) {
-          const amt = parseCurrencyNumber(val, 0);
-          if (amt > 0) {
-            rowCollectionSum += amt;
-            dayEntries.push({ day: d, amount: amt });
-          }
-        }
-      }
-
       if (status !== 'invalid') validRows++;
       totalPrincipal += principal;
-      totalCollections += rowCollectionSum;
+      totalCollections += collectionSum;
 
       if (rowIssues.length > 0) {
         warnings.push({
@@ -459,8 +476,8 @@ router.post('/preview', upload.single('file'), async (req, res) => {
         address,
         principal,
         collected_days_count: dayEntries.length,
-        total_collected: rowCollectionSum,
-        remaining: Math.max(0, principal - rowCollectionSum),
+        total_collected: collectionSum,
+        remaining: Math.max(0, principal - collectionSum),
         status,
         issues: rowIssues
       });
@@ -522,18 +539,24 @@ router.post('/import', upload.single('file'), async (req, res) => {
     let importedCollections = 0;
     const collectionStatements = [];
 
-    // Data rows start from row index 3 (Row 4 in Excel)
-    for (let i = 3; i < rows.length; i++) {
+    // Detect column positions dynamically (Area, Village, Address, Name, Phone, Principal)
+    const detected = detectHeaderAndColumns(rows);
+    const dataStartIndex = detected.dataStartIndex;
+    const mapping = detected.mapping;
+
+    // Data rows start from detected dataStartIndex
+    for (let i = dataStartIndex; i < rows.length; i++) {
       const row = rows[i];
-      if (!row || !row[2]) continue; // Name is mandatory
+      if (!row || !Array.isArray(row)) continue;
 
-      const slNo = row[0] ? parseInt(row[0], 10) : i;
-      const name = String(row[2]).trim();
-      const phone = row[3] ? String(row[3]).trim() : '';
-      const address = row[4] ? String(row[4]).trim() : '';
-      const principal = parseCurrencyNumber(row[5], 10000);
+      const extracted = extractClientRowData(row, mapping, i - dataStartIndex + 1, totalDays);
+      if (!extracted || !extracted.name) continue; // Name is mandatory
 
-      if (!name) continue;
+      const { slNo, name, phone, address, principal, dayEntries } = extracted;
+
+      const firstCell = String(row[0] || '').trim().toLowerCase();
+      if (/^(total|totals|summary|grand\s*total|மொத்தம்|கூடுதல்)/i.test(firstCell)) continue;
+      if (/^(total|totals|summary|grand\s*total|மொத்தம்|கூடுதல்)/i.test(name.toLowerCase())) continue;
 
       // Upsert client (match by phone, sl_no, or exact name)
       let clientId;
@@ -581,24 +604,22 @@ router.post('/import', upload.single('file'), async (req, res) => {
         );
       }
 
-      // Read day columns strictly up to totalDays
-      for (let d = 1; d <= totalDays; d++) {
-        const val = row[5 + d];
-        if (val !== undefined && val !== null && val !== '') {
-          const amount = parseCurrencyNumber(val, 0);
-          if (amount > 0) {
-            const dayPadded = String(d).padStart(2, '0');
-            const colDate = `${month_year}-${dayPadded}`;
-            const collId = `coll_${cycleId}_d${d}`;
+      // Read day collections from extracted day entries
+      for (const entry of dayEntries) {
+        const d = entry.day;
+        const amount = entry.amount;
+        if (amount > 0 && d <= totalDays) {
+          const dayPadded = String(d).padStart(2, '0');
+          const colDate = `${month_year}-${dayPadded}`;
+          const collId = `coll_${cycleId}_d${d}`;
 
-            collectionStatements.push({
-              sql: `INSERT INTO daily_collections (id, company_id, cycle_id, client_id, day_number, collection_date, amount, payment_mode, collected_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 'cash', 'ExcelImport')
-                    ON CONFLICT(cycle_id, day_number) DO UPDATE SET amount = excluded.amount`,
-              args: [collId, companyId, cycleId, clientId, d, colDate, amount]
-            });
-            importedCollections++;
-          }
+          collectionStatements.push({
+            sql: `INSERT INTO daily_collections (id, company_id, cycle_id, client_id, day_number, collection_date, amount, payment_mode, collected_by)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, 'cash', 'ExcelImport')
+                  ON CONFLICT(cycle_id, day_number) DO UPDATE SET amount = excluded.amount`,
+            args: [collId, companyId, cycleId, clientId, d, colDate, amount]
+          });
+          importedCollections++;
         }
       }
     }
@@ -749,7 +770,8 @@ router.get('/export-filtered', async (req, res) => {
     rows.sort((a, b) => {
       if (sortBy === 'name') return dir * a.name.localeCompare(b.name);
       if (sortBy === 'remaining') return dir * (a.remaining - b.remaining);
-      if (sortBy === 'collection_rate') return dir * (a.rate - b.rate);
+      if (sortBy === 'principal') return dir * ((a.principal || 0) - (b.principal || 0));
+      if (sortBy === 'collection_rate') return dir * ((a.rate || 0) - (b.rate || 0));
       return dir * ((a.sl_no || 0) - (b.sl_no || 0));
     });
 

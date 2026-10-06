@@ -323,7 +323,7 @@ export default function SettingsPage() {
         a.href = url;
         a.download = `alr_bigquery_dts_package_${new Date().toISOString().split('T')[0]}.json`;
         a.click();
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
         setBqMessage({
           type: 'success',
           text: lang === 'ta'

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { query, execute } from '../server/db.js';
-import { downloadRegisterPdf, downloadMemberHistoryPdf } from '../src/utils/pdfExport.js';
+import { downloadRegisterPdf, downloadMemberHistoryPdf, cleanPdfText } from '../src/utils/pdfExport.js';
 
 test('Advanced Export & Serial Number Range Filtering Suite', async (t) => {
   const companyId = 'comp_alr_001';
@@ -162,6 +162,48 @@ test('Advanced Export & Serial Number Range Filtering Suite', async (t) => {
     assert.ok(disposition.includes('snop65d'), `Header disposition should include snop65d: ${disposition}`);
     const buffer = await res.arrayBuffer();
     assert.ok(buffer.byteLength > 1000, 'Excel file for snop65d should have content');
+  });
+
+  await t.test('11. Phonetic Tamil transliteration in cleanPdfText produces clean Latin text', () => {
+    assert.strictEqual(cleanPdfText('P. Murugan (முருகன்)'), 'P. Murugan');
+    assert.strictEqual(cleanPdfText('முருகன்'), 'Murugan');
+    assert.strictEqual(cleanPdfText('அலங்காநல்லூர்'), 'Alanganallur');
+    assert.strictEqual(cleanPdfText('மதுரை'), 'Madurai');
+    assert.strictEqual(cleanPdfText('வாடிப்பட்டி'), 'Vadipatti');
+
+    // Confirm zero Tamil Unicode code points remain
+    const res = cleanPdfText('முத்து (Muthu)');
+    assert.ok(!/[\u0B80-\u0BFF]/.test(res), 'Should not contain raw Tamil code points');
+  });
+
+  await t.test('12. PDF Export supports both summary and detailed 31-day daily modes without errors', () => {
+    const mockRows = [
+      { sl_no: 1, client_code: 'ALR-01', name: 'முருகன்', address: 'அலங்காநல்லூர்', principal: 10000, total_collected: 10000, remaining: 0, excess: 0, collection_rate: 100, status: 'cleared', days: { 1: 500, 2: 500 } },
+      { sl_no: 2, client_code: 'ALR-02', name: 'செல்வி', address: 'மதுரை', principal: 15000, total_collected: 5000, remaining: 10000, excess: 0, collection_rate: 33, status: 'partial', days: { 1: 500 } }
+    ];
+
+    // Summary mode
+    assert.doesNotThrow(() => {
+      downloadRegisterPdf({
+        rows: mockRows,
+        summary: { total_clients: 2, total_principal: 25000, total_collected: 15000, total_remaining: 10000 },
+        filters: { status: 'all' },
+        monthYear: '2026-10',
+        showDays: false
+      });
+    });
+
+    // Detailed 31-day grid mode
+    assert.doesNotThrow(() => {
+      downloadRegisterPdf({
+        rows: mockRows,
+        summary: { total_clients: 2, total_principal: 25000, total_collected: 15000, total_remaining: 10000 },
+        filters: { status: 'all' },
+        monthYear: '2026-10',
+        showDays: true,
+        totalDays: 31
+      });
+    });
   });
 
   // Cleanup test records

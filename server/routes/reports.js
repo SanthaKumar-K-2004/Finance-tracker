@@ -542,6 +542,7 @@ router.get('/export-preview', async (req, res) => {
     rows.sort((a, b) => {
       if (sortBy === 'name') return dir * a.name.localeCompare(b.name);
       if (sortBy === 'remaining') return dir * (a.remaining - b.remaining);
+      if (sortBy === 'principal') return dir * ((a.principal || 0) - (b.principal || 0));
       if (sortBy === 'collection_rate') return dir * (a.collection_rate - b.collection_rate);
       return dir * ((a.sl_no || 0) - (b.sl_no || 0));
     });
