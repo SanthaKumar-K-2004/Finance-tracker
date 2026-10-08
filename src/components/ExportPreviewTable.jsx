@@ -1,18 +1,22 @@
 import React from 'react';
 import { useLanguage } from '../context/LanguageContext';
-import { CheckCircle2, AlertCircle, RotateCcw, RefreshCw, Users, IndianRupee, TrendingUp, Clock } from 'lucide-react';
+import { CheckCircle2, AlertCircle, RotateCcw, RefreshCw, Users, IndianRupee, TrendingUp, Clock, Calendar, ShieldCheck } from 'lucide-react';
 
 const statusStyles = {
   cleared: { bg: '#DCFCE7', color: '#166534', border: '#86EFAC', label: '✅ Cleared', labelTa: '✅ முடிந்தது' },
   partial: { bg: '#FEF3C7', color: '#92400E', border: '#FDE68A', label: '🟡 Partial', labelTa: '🟡 பகுதி' },
   pending: { bg: '#FEE2E2', color: '#991B1B', border: '#FECACA', label: '🔴 Pending', labelTa: '🔴 நிலுவை' },
-  zero: { bg: '#FEF2F2', color: '#991B1B', border: '#FECACA', label: '⚪ Zero', labelTa: '⚪ பூஜ்யம்' }
+  zero: { bg: '#FEF2F2', color: '#991B1B', border: '#FECACA', label: '⚪ Zero Paid', labelTa: '⚪ பூஜ்யம்' },
+  excess: { bg: '#E0E7FF', color: '#3730A3', border: '#C7D2FE', label: '🔵 Excess', labelTa: '🔵 கூடுதல்' }
 };
 
 export default function ExportPreviewTable({
   rows = [],
   totalDays = 31,
   monthYear = '',
+  scope = 'month',
+  scopeLabel = '',
+  viewMode = 'summary', // 'summary' | 'split_1_15' | 'split_16_31' | 'all_days'
   showDays = false,
   summary = {},
   columnSums = {},
@@ -30,6 +34,8 @@ export default function ExportPreviewTable({
     if (filters.village) activeFilterList.push(`Area: "${filters.village}"`);
     if (filters.search) activeFilterList.push(`Search: "${filters.search}"`);
     if (filters.minPrincipal || filters.maxPrincipal) activeFilterList.push(`₹${filters.minPrincipal || 0} - ₹${filters.maxPrincipal || 'Max'}`);
+    if (filters.day_number) activeFilterList.push(`Day ${filters.day_number} (${filters.day_status || 'all'})`);
+    if (filters.recovery_filter && filters.recovery_filter !== 'all') activeFilterList.push(`Recovery: ${filters.recovery_filter}`);
 
     return (
       <div style={{
@@ -97,6 +103,31 @@ export default function ExportPreviewTable({
     year: 'numeric'
   });
 
+  // Calculate day columns based on viewMode or showDays
+  const show1to15 = viewMode === 'split_1_15';
+  const show16to31 = viewMode === 'split_16_31';
+  const showAllDays = showDays || viewMode === 'all_days';
+
+  let startDay = 1;
+  let endDay = totalDays || 31;
+  let renderDays = false;
+
+  if (show1to15) {
+    startDay = 1;
+    endDay = 15;
+    renderDays = true;
+  } else if (show16to31) {
+    startDay = 16;
+    endDay = totalDays || 31;
+    renderDays = true;
+  } else if (showAllDays) {
+    startDay = 1;
+    endDay = totalDays || 31;
+    renderDays = true;
+  }
+
+  const isMultiMonth = scope === 'range' || scope === 'all_history';
+
   return (
     <div className="export-preview-wrapper export-print-area" id="printable-export-area">
       {/* Printable Header (Visible ONLY when printed) */}
@@ -105,11 +136,11 @@ export default function ExportPreviewTable({
           <div>
             <h1 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: '#0f172a' }}>{companyName}</h1>
             <p style={{ fontSize: '12px', margin: '3px 0 0', fontWeight: 600, color: '#334155' }}>
-              DAILY COLLECTION REGISTER (ALR) • MONTH: {monthYear}
+              DAILY COLLECTION REGISTER (ALR) • {scopeLabel || monthYear}
             </p>
             <p style={{ fontSize: '11px', margin: '3px 0 0', color: '#64748b' }}>
               Filters: Status: {(filters.status || 'All').toUpperCase()} |
-              {filters.from_sl_no || filters.to_sl_no ? ` Range/Code: ${filters.from_sl_no || 'Start'} to ${filters.to_sl_no || 'End'} |` : ''}
+              {filters.from_sl_no || filters.to_sl_no ? ` Range: ${filters.from_sl_no || 'Start'} to ${filters.to_sl_no || 'End'} |` : ''}
               {filters.village ? ` Village: ${filters.village} |` : ''}
               Total Records: {rows.length}
             </p>
@@ -131,7 +162,7 @@ export default function ExportPreviewTable({
         marginBottom: '14px'
       }}>
         <StatCard
-          label={lang === 'ta' ? 'வாடிக்கையாளர்' : 'Total Clients'}
+          label={lang === 'ta' ? 'வாடிக்கையாளர்' : 'Total Loans / Clients'}
           value={summary.total_clients || rows.length}
           color="#3730A3"
           bg="#EEF2FF"
@@ -180,6 +211,33 @@ export default function ExportPreviewTable({
         />
       </div>
 
+      {/* Day Filter Notice Banner */}
+      {filters.day_number && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 14px',
+          background: 'rgba(99, 102, 241, 0.08)',
+          border: '1px solid var(--indigo-border, #C7D2FE)',
+          borderRadius: '8px',
+          marginBottom: '10px',
+          fontSize: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Calendar size={15} color="var(--indigo-primary)" />
+            <span style={{ fontWeight: 800, color: 'var(--indigo-primary)' }}>
+              {lang === 'ta'
+                ? `நாள் ${filters.day_number} வடிகட்டப்பட்டது (${filters.day_status === 'paid' ? 'செலுத்தியவர்கள் மட்டும்' : filters.day_status === 'unpaid' ? 'செலுத்தாதவர்கள் (Defaulters)' : 'அனைத்தும்'})`
+                : `Filtered by Day ${filters.day_number} (${filters.day_status === 'paid' ? 'Paid Only' : filters.day_status === 'unpaid' ? 'Unpaid Defaulters' : 'All Borrowers'})`}
+            </span>
+          </div>
+          <span style={{ fontWeight: 700, color: 'var(--text-secondary)' }}>
+            {rows.length} {lang === 'ta' ? 'பொருந்தும் நபர்கள்' : 'matching records'}
+          </span>
+        </div>
+      )}
+
       {/* Data Table */}
       <div style={{ position: 'relative', overflowX: 'auto', borderRadius: 'var(--radius-lg)', border: '1px solid #1E293B', minHeight: '120px', boxShadow: 'var(--shadow-sm)' }}>
         {isLoading && (
@@ -208,25 +266,58 @@ export default function ExportPreviewTable({
               <th style={{ position: 'sticky', left: 0, zIndex: 12, background: '#0F172A', color: '#FFFFFF', minWidth: '50px', textAlign: 'center', borderRight: '1px solid #1E293B', padding: '10px 6px' }}>
                 {lang === 'ta' ? 'எண்' : 'Sl'}
               </th>
-              <th style={{ position: 'sticky', left: '50px', zIndex: 12, background: '#0F172A', color: '#FFFFFF', minWidth: '145px', textAlign: 'left', borderRight: '1px solid #1E293B', padding: '10px 8px' }}>
+              {isMultiMonth && (
+                <th style={{ background: '#0F172A', color: '#94A3B8', minWidth: '85px', textAlign: 'center', borderRight: '1px solid #1E293B', padding: '10px 6px' }}>
+                  {lang === 'ta' ? 'மாதம்' : 'Cycle'}
+                </th>
+              )}
+              <th style={{ position: 'sticky', left: isMultiMonth ? '85px' : '50px', zIndex: 12, background: '#0F172A', color: '#FFFFFF', minWidth: '145px', textAlign: 'left', borderRight: '1px solid #1E293B', padding: '10px 8px' }}>
                 {lang === 'ta' ? 'பெயர்' : 'Name'}
               </th>
-              <th style={{ background: '#0F172A', color: '#F8FAFC', minWidth: '105px', textAlign: 'center', borderRight: '1px solid #1E293B', padding: '10px 6px' }}>{lang === 'ta' ? 'தொலைபேசி' : 'Phone'}</th>
-              <th style={{ background: '#0F172A', color: '#F8FAFC', minWidth: '140px', textAlign: 'left', borderRight: '1px solid #1E293B', padding: '10px 8px' }}>{lang === 'ta' ? 'ஊர் / முகவரி' : 'Village / Address'}</th>
-              <th style={{ background: '#0F172A', color: '#F8FAFC', textAlign: 'right', minWidth: '95px', borderRight: '1px solid #1E293B', padding: '10px 8px' }}>{lang === 'ta' ? 'அசல்' : 'Principal'}</th>
-              {showDays && Array.from({ length: totalDays }, (_, i) => (
-                <th key={i + 1} style={{ background: '#0F172A', textAlign: 'center', minWidth: '38px', fontSize: '11px', padding: '6px 2px', color: '#94A3B8', borderRight: '1px solid #1E293B' }}>
-                  {i + 1}
-                </th>
-              ))}
+              <th style={{ background: '#0F172A', color: '#F8FAFC', minWidth: '105px', textAlign: 'center', borderRight: '1px solid #1E293B', padding: '10px 6px' }}>
+                {lang === 'ta' ? 'தொலைபேசி' : 'Phone'}
+              </th>
+              <th style={{ background: '#0F172A', color: '#F8FAFC', minWidth: '135px', textAlign: 'left', borderRight: '1px solid #1E293B', padding: '10px 8px' }}>
+                {lang === 'ta' ? 'ஊர் / முகவரி' : 'Village / Address'}
+              </th>
+              <th style={{ background: '#0F172A', color: '#F8FAFC', textAlign: 'right', minWidth: '95px', borderRight: '1px solid #1E293B', padding: '10px 8px' }}>
+                {lang === 'ta' ? 'அசல்' : 'Principal'}
+              </th>
+
+              {/* Day Columns */}
+              {renderDays && Array.from({ length: endDay - startDay + 1 }, (_, i) => {
+                const dayNum = startDay + i;
+                const isFilteredDay = filters.day_number === dayNum;
+                return (
+                  <th key={dayNum} style={{
+                    background: isFilteredDay ? '#312E81' : '#0F172A',
+                    textAlign: 'center',
+                    minWidth: '38px',
+                    fontSize: '11px',
+                    padding: '6px 2px',
+                    color: isFilteredDay ? '#FDE047' : '#94A3B8',
+                    borderRight: '1px solid #1E293B'
+                  }}>
+                    {dayNum}
+                  </th>
+                );
+              })}
+
               <th style={{ background: '#0F172A', textAlign: 'right', minWidth: '100px', fontWeight: 800, color: '#34D399', borderRight: '1px solid #1E293B', padding: '10px 8px' }}>
-                {lang === 'ta' ? 'மொத்தம்' : 'Total'}
+                {lang === 'ta' ? 'வசூல்' : 'Collected'}
               </th>
               <th style={{ background: '#0F172A', textAlign: 'right', minWidth: '100px', fontWeight: 800, color: '#F87171', borderRight: '1px solid #1E293B', padding: '10px 8px' }}>
                 {lang === 'ta' ? 'நிலுவை' : 'Remaining'}
               </th>
-              <th style={{ background: '#0F172A', textAlign: 'right', minWidth: '85px', color: '#94A3B8', borderRight: '1px solid #1E293B', padding: '10px 6px' }}>{lang === 'ta' ? 'கூடுதல்' : 'Excess'}</th>
-              <th style={{ background: '#0F172A', textAlign: 'center', minWidth: '95px', color: '#F8FAFC', padding: '10px 6px' }}>{lang === 'ta' ? 'நிலை' : 'Status'}</th>
+              <th style={{ background: '#0F172A', textAlign: 'right', minWidth: '75px', color: '#94A3B8', borderRight: '1px solid #1E293B', padding: '10px 6px' }}>
+                {lang === 'ta' ? 'கூடுதல்' : 'Excess'}
+              </th>
+              <th style={{ background: '#0F172A', textAlign: 'center', minWidth: '75px', color: '#94A3B8', borderRight: '1px solid #1E293B', padding: '10px 6px' }}>
+                {lang === 'ta' ? 'விகிதம்' : 'Rate %'}
+              </th>
+              <th style={{ background: '#0F172A', textAlign: 'center', minWidth: '95px', color: '#F8FAFC', padding: '10px 6px' }}>
+                {lang === 'ta' ? 'நிலை' : 'Status'}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -244,7 +335,12 @@ export default function ExportPreviewTable({
                       </span>
                     )}
                   </td>
-                  <td style={{ position: 'sticky', left: '50px', zIndex: 5, background: rowBg, fontWeight: 800, textAlign: 'left', borderRight: '1px solid var(--border-subtle)', padding: '8px 8px', color: 'var(--text-primary)' }}>
+                  {isMultiMonth && (
+                    <td className="font-mono" style={{ fontSize: '11px', textAlign: 'center', borderRight: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+                      {row.month_year || '-'}
+                    </td>
+                  )}
+                  <td style={{ position: 'sticky', left: isMultiMonth ? '85px' : '50px', zIndex: 5, background: rowBg, fontWeight: 800, textAlign: 'left', borderRight: '1px solid var(--border-subtle)', padding: '8px 8px', color: 'var(--text-primary)' }}>
                     {row.name}
                   </td>
                   <td className="font-mono" style={{ fontSize: '12px', textAlign: 'center', borderRight: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
@@ -256,22 +352,29 @@ export default function ExportPreviewTable({
                   <td className="font-mono" style={{ textAlign: 'right', fontWeight: 700, borderRight: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}>
                     ₹{row.principal.toLocaleString('en-IN')}
                   </td>
-                  {showDays && Array.from({ length: totalDays }, (_, i) => {
-                    const dayVal = (row.days && row.days[i + 1]) || 0;
+
+                  {/* Day Values */}
+                  {renderDays && Array.from({ length: endDay - startDay + 1 }, (_, i) => {
+                    const dayNum = startDay + i;
+                    const dayVal = (row.days && row.days[dayNum]) || 0;
+                    const isFilteredDay = filters.day_number === dayNum;
                     return (
-                      <td key={i + 1} className="font-mono" style={{
+                      <td key={dayNum} className="font-mono" style={{
                         textAlign: 'center',
                         fontSize: '11px',
                         padding: '3px 1px',
                         color: dayVal > 0 ? '#166534' : 'var(--text-muted)',
                         fontWeight: dayVal > 0 ? 800 : 400,
-                        background: dayVal > 0 ? '#DCFCE7' : 'transparent',
+                        background: isFilteredDay
+                          ? (dayVal > 0 ? '#FEF08A' : '#FEE2E2')
+                          : (dayVal > 0 ? '#DCFCE7' : 'transparent'),
                         borderRight: '1px solid var(--border-subtle)'
                       }}>
                         {dayVal > 0 ? dayVal : ''}
                       </td>
                     );
                   })}
+
                   <td className="font-mono" style={{ textAlign: 'right', fontWeight: 800, color: '#065F46', background: '#ECFDF5', borderRight: '1px solid var(--border-subtle)' }}>
                     ₹{row.total_collected.toLocaleString('en-IN')}
                   </td>
@@ -280,6 +383,9 @@ export default function ExportPreviewTable({
                   </td>
                   <td className="font-mono" style={{ textAlign: 'right', color: 'var(--text-muted)', borderRight: '1px solid var(--border-subtle)' }}>
                     {row.excess > 0 ? `₹${row.excess.toLocaleString('en-IN')}` : '-'}
+                  </td>
+                  <td className="font-mono" style={{ textAlign: 'center', fontWeight: 700, color: row.collection_rate >= 80 ? '#166534' : (row.collection_rate >= 50 ? '#92400E' : '#991B1B'), borderRight: '1px solid var(--border-subtle)' }}>
+                    {row.collection_rate || 0}%
                   </td>
                   <td style={{ textAlign: 'center', padding: '8px 6px' }}>
                     <span style={{
@@ -304,31 +410,35 @@ export default function ExportPreviewTable({
           {/* Totals Footer */}
           <tfoot>
             <tr style={{ fontWeight: 800, background: 'var(--bg-surface-active)', borderTop: '2px solid var(--border-strong)' }}>
-              <td colSpan={2} style={{ position: 'sticky', left: 0, background: 'var(--bg-surface-active)', textAlign: 'left' }}>
+              <td colSpan={isMultiMonth ? 3 : 2} style={{ position: 'sticky', left: 0, background: 'var(--bg-surface-active)', textAlign: 'left', padding: '10px 8px' }}>
                 {lang === 'ta' ? 'மொத்தம்' : 'TOTALS'}
               </td>
               <td colSpan={2} style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px' }}>
                 {rows.length} {lang === 'ta' ? 'நபர்கள்' : 'Borrowers'}
               </td>
-              <td className="font-mono" style={{ textAlign: 'right' }}>
+              <td className="font-mono" style={{ textAlign: 'right', padding: '10px 8px' }}>
                 ₹{(summary.total_principal || rows.reduce((s, r) => s + r.principal, 0)).toLocaleString('en-IN')}
               </td>
-              {showDays && Array.from({ length: totalDays }, (_, i) => {
-                const sum = columnSums[i + 1] || 0;
+              {renderDays && Array.from({ length: endDay - startDay + 1 }, (_, i) => {
+                const dayNum = startDay + i;
+                const sum = columnSums[dayNum] || 0;
                 return (
-                  <td key={i + 1} className="font-mono" style={{ textAlign: 'center', fontSize: '11px', fontWeight: 700, color: 'var(--emerald-primary)' }}>
+                  <td key={dayNum} className="font-mono" style={{ textAlign: 'center', fontSize: '11px', fontWeight: 700, color: 'var(--emerald-primary)' }}>
                     {sum > 0 ? sum : ''}
                   </td>
                 );
               })}
-              <td className="font-mono" style={{ textAlign: 'right', color: '#166534', fontWeight: 800, background: 'rgba(5,150,105,0.1)' }}>
+              <td className="font-mono" style={{ textAlign: 'right', color: '#166534', fontWeight: 800, background: 'rgba(5,150,105,0.1)', padding: '10px 8px' }}>
                 ₹{(summary.total_collected || rows.reduce((s, r) => s + r.total_collected, 0)).toLocaleString('en-IN')}
               </td>
-              <td className="font-mono" style={{ textAlign: 'right', color: '#991B1B', fontWeight: 800, background: 'rgba(239,68,68,0.1)' }}>
+              <td className="font-mono" style={{ textAlign: 'right', color: '#991B1B', fontWeight: 800, background: 'rgba(239,68,68,0.1)', padding: '10px 8px' }}>
                 ₹{(summary.total_remaining || rows.reduce((s, r) => s + r.remaining, 0)).toLocaleString('en-IN')}
               </td>
-              <td className="font-mono" style={{ textAlign: 'right', color: 'var(--emerald-primary)' }}>
+              <td className="font-mono" style={{ textAlign: 'right', color: 'var(--emerald-primary)', padding: '10px 6px' }}>
                 ₹{(summary.total_excess || rows.reduce((s, r) => s + r.excess, 0)).toLocaleString('en-IN')}
+              </td>
+              <td style={{ textAlign: 'center', fontSize: '11px', fontWeight: 800 }}>
+                {summary.total_principal > 0 ? Math.round((summary.total_collected / summary.total_principal) * 100) : 0}%
               </td>
               <td style={{ textAlign: 'center', fontSize: '11px', fontWeight: 700 }}>
                 {summary.cleared_count || 0} Cleared

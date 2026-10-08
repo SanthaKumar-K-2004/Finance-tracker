@@ -25,6 +25,7 @@ data/
 *.xlsx
 *.xls
 *.pdf
+*.csv
 uploads/
 data/uploads/
 

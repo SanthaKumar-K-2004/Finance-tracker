@@ -417,43 +417,76 @@ router.get('/member-history', handleMemberHistory);
 // GET export preview data (filtered, for Export Center frontend)
 router.get('/export-preview', async (req, res) => {
   try {
+    const scope = req.query.scope || 'month'; // 'month' | 'range' | 'all_history'
     const month_year = sanitizeMonthYear(req.query.month_year);
-    const statusFilter = req.query.status || 'all'; // all|pending|cleared
+    const fromMonth = req.query.from_month ? sanitizeMonthYear(req.query.from_month) : null;
+    const toMonth = req.query.to_month ? sanitizeMonthYear(req.query.to_month) : null;
+    
+    const statusFilter = req.query.status || 'all'; // all | pending | cleared | partial | zero | excess
     const village = (req.query.village || '').trim();
     const search = (req.query.search || '').trim();
     const fromSlNo = cleanIdentifier(req.query.from_sl_no);
     const toSlNo = cleanIdentifier(req.query.to_sl_no);
     const minPrincipal = Number(req.query.min_principal) || 0;
     const maxPrincipal = Number(req.query.max_principal) || Infinity;
-    const sortBy = req.query.sort_by || 'sl_no'; // sl_no|name|remaining|collection_rate
+    const sortBy = req.query.sort_by || 'sl_no';
     const sortOrder = req.query.sort_order || 'asc';
+    const dayNumber = req.query.day_number ? parseInt(req.query.day_number, 10) : null;
+    const dayStatus = req.query.day_status || 'all'; // all | paid | unpaid
+    const recoveryFilter = req.query.recovery_filter || 'all'; // all | critical | moderate | near_clear | cleared
     const companyId = 'comp_alr_001';
 
-    // Fetch cycles, collections in parallel
+    // Construct SQL WHERE clause depending on scope
+    let cycleWhereSql = `lc.company_id = ? AND c.status != 'deleted' AND lc.status != 'archived'`;
+    let cycleParams = [companyId];
+
+    let collWhereSql = `lc.company_id = ? AND lc.status != 'archived'`;
+    let collParams = [companyId];
+
+    let effectiveScopeLabel = month_year;
+
+    if (scope === 'range' && fromMonth && toMonth) {
+      cycleWhereSql += ` AND lc.month_year >= ? AND lc.month_year <= ?`;
+      cycleParams.push(fromMonth, toMonth);
+      collWhereSql += ` AND lc.month_year >= ? AND lc.month_year <= ?`;
+      collParams.push(fromMonth, toMonth);
+      effectiveScopeLabel = `${fromMonth} to ${toMonth}`;
+    } else if (scope === 'all_history') {
+      // All history across all months
+      effectiveScopeLabel = 'All History';
+    } else {
+      // Default: single month
+      cycleWhereSql += ` AND lc.month_year = ?`;
+      cycleParams.push(month_year);
+      collWhereSql += ` AND lc.month_year = ?`;
+      collParams.push(month_year);
+    }
+
+    // Fetch cycles and collections concurrently
     const [cycles, collections] = await Promise.all([
       query(
-        `SELECT lc.id as cycle_id, lc.principal, lc.start_date, lc.close_date, lc.total_days,
+        `SELECT lc.id as cycle_id, lc.month_year, lc.principal, lc.start_date, lc.close_date, lc.total_days,
                 c.id as client_id, c.sl_no, c.client_code, c.name, c.phone, c.address
          FROM loan_cycles lc
          JOIN clients c ON c.id = lc.client_id
-         WHERE lc.company_id = ? AND lc.month_year = ? AND c.status != 'deleted' AND lc.status != 'archived'
-         ORDER BY c.sl_no ASC`,
-        [companyId, month_year]
+         WHERE ${cycleWhereSql}
+         ORDER BY c.sl_no ASC, lc.month_year ASC`,
+        cycleParams
       ),
       query(
-        `SELECT dc.cycle_id, dc.day_number, dc.amount
+        `SELECT dc.cycle_id, dc.day_number, dc.amount, dc.collection_date
          FROM daily_collections dc
          JOIN loan_cycles lc ON lc.id = dc.cycle_id
-         WHERE lc.company_id = ? AND lc.month_year = ?`,
-        [companyId, month_year]
+         WHERE ${collWhereSql}`,
+        collParams
       )
     ]);
 
-    // Group collections
+    // Group collections by cycle_id
     const collsByCycle = {};
     collections.forEach(c => {
       if (!collsByCycle[c.cycle_id]) collsByCycle[c.cycle_id] = {};
-      collsByCycle[c.cycle_id][c.day_number] = Number(c.amount) || 0;
+      collsByCycle[c.cycle_id][c.day_number] = (collsByCycle[c.cycle_id][c.day_number] || 0) + (Number(c.amount) || 0);
     });
 
     const [yearNum, monthNum] = month_year.split('-').map(Number);
@@ -464,7 +497,8 @@ router.get('/export-preview', async (req, res) => {
       const dayMap = collsByCycle[c.cycle_id] || {};
       let totalCollected = 0;
       const days = {};
-      for (let d = 1; d <= totalDays; d++) {
+      const cycleTotalDays = c.total_days || totalDays;
+      for (let d = 1; d <= 31; d++) {
         const amt = dayMap[d] || 0;
         days[d] = amt;
         totalCollected += amt;
@@ -482,6 +516,7 @@ router.get('/export-preview', async (req, res) => {
       return {
         cycle_id: c.cycle_id,
         client_id: c.client_id,
+        month_year: c.month_year,
         sl_no: c.sl_no,
         client_code: c.client_code || null,
         name: c.name,
@@ -490,18 +525,19 @@ router.get('/export-preview', async (req, res) => {
         principal: c.principal,
         start_date: c.start_date,
         close_date: c.close_date,
-        total_days: c.total_days || totalDays,
+        total_days: cycleTotalDays,
         total_collected: totalCollected,
         remaining,
         excess,
         collection_rate: collectionRate,
+        recovery_rate: collectionRate,
         paid_days: paidDays,
         status,
         days
       };
     });
 
-    // Auto-adopt all distinct villages/areas across all clients in this month
+    // Auto-adopt distinct villages across all active clients
     const villageCounts = {};
     rows.forEach(r => {
       const v = (r.address || '').trim();
@@ -513,14 +549,45 @@ router.get('/export-preview', async (req, res) => {
       .sort((a, b) => a.localeCompare(b))
       .map(name => ({ name, count: villageCounts[name] }));
 
-    // Apply filters
-    if (statusFilter === 'pending') rows = rows.filter(r => r.status === 'pending' || r.status === 'zero');
-    else if (statusFilter === 'cleared') rows = rows.filter(r => r.status === 'cleared');
-    else if (statusFilter === 'partial') rows = rows.filter(r => r.status === 'partial');
+    // 1. Status Filter
+    if (statusFilter === 'pending') {
+      rows = rows.filter(r => r.status === 'pending' || r.status === 'zero');
+    } else if (statusFilter === 'cleared') {
+      rows = rows.filter(r => r.status === 'cleared');
+    } else if (statusFilter === 'partial') {
+      rows = rows.filter(r => r.status === 'partial');
+    } else if (statusFilter === 'zero') {
+      rows = rows.filter(r => r.total_collected === 0);
+    } else if (statusFilter === 'excess') {
+      rows = rows.filter(r => r.excess > 0);
+    }
 
+    // 2. Recovery Rate Filter
+    if (recoveryFilter === 'critical' || recoveryFilter === 'lt_50') {
+      rows = rows.filter(r => r.collection_rate < 50);
+    } else if (recoveryFilter === 'moderate' || recoveryFilter === '50_90') {
+      rows = rows.filter(r => r.collection_rate >= 50 && r.collection_rate < 90);
+    } else if (recoveryFilter === 'near_clear' || recoveryFilter === 'gte_90') {
+      rows = rows.filter(r => r.collection_rate >= 90 && r.collection_rate < 100);
+    } else if (recoveryFilter === 'cleared' || recoveryFilter === '100') {
+      rows = rows.filter(r => r.collection_rate >= 100);
+    }
+
+    // 3. Day Number & Day Status Filter (Paid vs Unpaid on Day X)
+    if (dayNumber && dayNumber >= 1 && dayNumber <= 31) {
+      if (dayStatus === 'paid') {
+        rows = rows.filter(r => (r.days && r.days[dayNumber] > 0));
+      } else if (dayStatus === 'unpaid') {
+        rows = rows.filter(r => !r.days || (r.days[dayNumber] || 0) === 0);
+      }
+    }
+
+    // 4. Village Filter
     if (village) {
       rows = rows.filter(r => (r.address || '').toLowerCase().includes(village.toLowerCase()));
     }
+
+    // 5. Search Query
     if (search) {
       const s = search.toLowerCase();
       rows = rows.filter(r =>
@@ -528,27 +595,34 @@ router.get('/export-preview', async (req, res) => {
         (r.phone && r.phone.includes(s)) ||
         String(r.sl_no) === s ||
         (r.client_code && r.client_code.toLowerCase().includes(s)) ||
-        (r.client_id && r.client_id.toLowerCase().includes(s))
+        (r.client_id && r.client_id.toLowerCase().includes(s)) ||
+        (r.address && r.address.toLowerCase().includes(s))
       );
     }
+
+    // 6. Principal Range
     if (minPrincipal > 0) rows = rows.filter(r => r.principal >= minPrincipal);
     if (maxPrincipal < Infinity) rows = rows.filter(r => r.principal <= maxPrincipal);
+
+    // 7. Identifier / Serial Range
     if (fromSlNo || toSlNo) {
       rows = rows.filter(r => matchesIdentifierRange(r, fromSlNo, toSlNo));
     }
 
-    // Sort
+    // 8. Sorting
     const dir = sortOrder === 'desc' ? -1 : 1;
     rows.sort((a, b) => {
       if (sortBy === 'name') return dir * a.name.localeCompare(b.name);
       if (sortBy === 'remaining') return dir * (a.remaining - b.remaining);
       if (sortBy === 'principal') return dir * ((a.principal || 0) - (b.principal || 0));
       if (sortBy === 'collection_rate') return dir * (a.collection_rate - b.collection_rate);
+      if (sortBy === 'total_collected') return dir * (a.total_collected - b.total_collected);
       return dir * ((a.sl_no || 0) - (b.sl_no || 0));
     });
 
-    // Summary
+    // Summary Totals
     const summary = {
+      total_records: rows.length,
       total_clients: rows.length,
       total_principal: rows.reduce((s, r) => s + r.principal, 0),
       total_collected: rows.reduce((s, r) => s + r.total_collected, 0),
@@ -559,21 +633,155 @@ router.get('/export-preview', async (req, res) => {
       partial_count: rows.filter(r => r.status === 'partial').length
     };
 
-    // Column sums for day totals
+    // Column sums for daily totals (1 to 31)
     const columnSums = {};
-    for (let d = 1; d <= totalDays; d++) {
-      columnSums[d] = rows.reduce((s, r) => s + (r.days[d] || 0), 0);
+    for (let d = 1; d <= 31; d++) {
+      columnSums[d] = rows.reduce((s, r) => s + ((r.days && r.days[d]) || 0), 0);
     }
 
     res.json({
       success: true,
+      scope,
+      scope_label: effectiveScopeLabel,
       month_year,
+      from_month: fromMonth,
+      to_month: toMonth,
       total_days: totalDays,
-      filters: { status: statusFilter, village, search, minPrincipal, maxPrincipal, from_sl_no: fromSlNo, to_sl_no: toSlNo, sortBy, sortOrder },
+      day_number: dayNumber,
+      day_status: dayStatus,
+      recovery_filter: recoveryFilter,
+      filters: {
+        status: statusFilter,
+        village,
+        search,
+        minPrincipal,
+        maxPrincipal,
+        from_sl_no: fromSlNo,
+        to_sl_no: toSlNo,
+        sortBy,
+        sortOrder,
+        day_number: dayNumber,
+        day_status: dayStatus,
+        recovery_filter: recoveryFilter
+      },
       summary,
       column_sums: columnSums,
       villages: allVillages,
       rows
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// GET all-history lifetime portfolio aggregated overview
+router.get('/all-history-preview', async (req, res) => {
+  try {
+    const companyId = 'comp_alr_001';
+
+    // Fetch all clients, cycles, collections across entire database
+    const [clients, cycles, collections, closedList] = await Promise.all([
+      query(
+        `SELECT id, sl_no, client_code, name, phone, address, status, created_at
+         FROM clients WHERE company_id = ? AND status != 'deleted'
+         ORDER BY sl_no ASC`,
+        [companyId]
+      ),
+      query(
+        `SELECT id, client_id, month_year, cycle_name, principal, start_date, total_days, status
+         FROM loan_cycles WHERE company_id = ? AND status != 'archived'
+         ORDER BY month_year ASC`,
+        [companyId]
+      ),
+      query(
+        `SELECT cycle_id, client_id, amount
+         FROM daily_collections WHERE company_id = ?`,
+        [companyId]
+      ),
+      query(
+        `SELECT client_id, final_principal, total_collected, excess_amount, closed_date, closure_reason
+         FROM closed_clients WHERE company_id = ?`,
+        [companyId]
+      )
+    ]);
+
+    // Group collections by client_id and by cycle_id
+    const collsByClient = {};
+    const collsByCycle = {};
+    collections.forEach(c => {
+      const amt = Number(c.amount) || 0;
+      collsByClient[c.client_id] = (collsByClient[c.client_id] || 0) + amt;
+      collsByCycle[c.cycle_id] = (collsByCycle[c.cycle_id] || 0) + amt;
+    });
+
+    // Group cycles by client_id
+    const cyclesByClient = {};
+    cycles.forEach(c => {
+      if (!cyclesByClient[c.client_id]) cyclesByClient[c.client_id] = [];
+      cyclesByClient[c.client_id].push({
+        ...c,
+        total_collected: collsByCycle[c.id] || 0,
+        remaining: Math.max(0, c.principal - (collsByCycle[c.id] || 0))
+      });
+    });
+
+    // Group closed by client_id
+    const closedByClient = {};
+    closedList.forEach(cl => {
+      if (!closedByClient[cl.client_id]) closedByClient[cl.client_id] = [];
+      closedByClient[cl.client_id].push(cl);
+    });
+
+    // Build borrower lifetime items
+    const borrowers = clients.map(cl => {
+      const clientCycles = cyclesByClient[cl.id] || [];
+      const totalPrincipal = clientCycles.reduce((s, c) => s + c.principal, 0);
+      const totalCollected = collsByClient[cl.id] || 0;
+      const remaining = Math.max(0, totalPrincipal - totalCollected);
+      const excess = Math.max(0, totalCollected - totalPrincipal);
+      const recoveryRate = totalPrincipal > 0 ? Math.round((totalCollected / totalPrincipal) * 100) : 0;
+      const closedRecords = closedByClient[cl.id] || [];
+
+      return {
+        id: cl.id,
+        sl_no: cl.sl_no,
+        client_code: cl.client_code,
+        name: cl.name,
+        phone: cl.phone || '',
+        address: cl.address || '',
+        cycle_count: clientCycles.length,
+        total_principal: totalPrincipal,
+        total_collected: totalCollected,
+        remaining,
+        excess,
+        recovery_rate: recoveryRate,
+        is_cleared: remaining === 0 && totalPrincipal > 0,
+        cycles: clientCycles,
+        closed_records: closedRecords
+      };
+    });
+
+    const lifetimePrincipal = borrowers.reduce((s, b) => s + b.total_principal, 0);
+    const lifetimeCollected = borrowers.reduce((s, b) => s + b.total_collected, 0);
+    const lifetimeRemaining = Math.max(0, lifetimePrincipal - lifetimeCollected);
+    const overallRate = lifetimePrincipal > 0 ? Math.round((lifetimeCollected / lifetimePrincipal) * 100) : 0;
+
+    res.json({
+      success: true,
+      total_borrowers: borrowers.length,
+      total_records: borrowers.length,
+      summary: {
+        total_records: borrowers.length,
+        total_borrowers: borrowers.length,
+        total_principal: lifetimePrincipal,
+        total_collected: lifetimeCollected,
+        total_remaining: lifetimeRemaining,
+        recovery_rate: overallRate,
+        cleared_borrowers: borrowers.filter(b => b.is_cleared).length,
+        pending_borrowers: borrowers.filter(b => !b.is_cleared).length
+      },
+      borrowers,
+      rows: borrowers
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

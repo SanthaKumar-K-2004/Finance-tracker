@@ -1,6 +1,7 @@
 import { db, query, execute, initSchema } from './db.js';
 import xlsx from 'xlsx';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 

@@ -1,4 +1,4 @@
-import { spawnSync } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import http from 'http';
 import app from '../server/app.js';
 
@@ -32,7 +32,9 @@ const testSuites = [
   ['--test', 'test/enterprise_readiness_audit.test.js'],
   ['--test', 'test/client_excel_test_validation.test.js'],
   ['--test', 'test/duplicate_and_area_village_preview.test.js'],
-  ['--test', 'test/universal_excel_import_engine.test.js']
+  ['--test', 'test/universal_excel_import_engine.test.js'],
+  ['--test', 'test/demo_excel_import_20_clients.test.js'],
+  ['test/export_and_pdf_features.test.js']
 ];
 
 async function isServerRunning() {
@@ -48,17 +50,20 @@ async function main() {
   console.log('🧪 ALR Finance Suite: Automated Verification Engine');
   console.log('==================================================');
 
-  let serverInstance = null;
+  let serverProcess = null;
   const running = await isServerRunning();
 
   if (!running) {
-    console.log('🚀 Spawning in-process test server on port 5000...');
-    serverInstance = http.createServer(app);
-    await new Promise((resolve, reject) => {
-      serverInstance.listen(5000, '0.0.0.0', resolve);
-      serverInstance.on('error', reject);
+    console.log('🚀 Spawning background test server on port 5000...');
+    serverProcess = spawn('node', ['server/index.js'], {
+      stdio: 'ignore',
+      env: { ...process.env, PORT: '5000', NODE_ENV: 'test' }
     });
-    console.log('✅ In-process test server active on http://localhost:5000');
+    for (let attempts = 0; attempts < 40; attempts++) {
+      await new Promise(r => setTimeout(r, 250));
+      if (await isServerRunning()) break;
+    }
+    console.log('✅ Background test server active on http://localhost:5000');
   } else {
     console.log('🔗 Attaching to active server on http://localhost:5000');
   }
@@ -83,10 +88,10 @@ async function main() {
       }
     }
   } finally {
-    if (serverInstance) {
-      console.log('\n🛑 Shutting down in-process test server...');
-      await new Promise(resolve => serverInstance.close(resolve));
-      console.log('✅ In-process test server shut down cleanly.');
+    if (serverProcess) {
+      console.log('\n🛑 Shutting down background test server...');
+      serverProcess.kill('SIGTERM');
+      console.log('✅ Background test server shut down cleanly.');
     }
   }
 

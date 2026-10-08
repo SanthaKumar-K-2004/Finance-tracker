@@ -34,10 +34,21 @@ import {
   Eye,
   MapPin,
   IndianRupee,
-  ShieldCheck
+  ShieldCheck,
+  Calendar,
+  CalendarRange,
+  Clock,
+  ClipboardList,
+  Columns,
+  Table2
 } from 'lucide-react';
 import ExportPreviewTable from '../components/ExportPreviewTable';
-import { downloadRegisterPdf, downloadMemberHistoryPdf } from '../utils/pdfExport';
+import {
+  downloadRegisterPdf,
+  downloadMemberHistoryPdf,
+  downloadFieldCollectionSheetPdf,
+  downloadAllHistoryPdf
+} from '../utils/pdfExport';
 
 export default function ExcelPage({ activeMonth, onDataChanged }) {
   const { lang, t } = useLanguage();
@@ -70,7 +81,20 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
   // ==========================================================================
   // TAB 1: ADVANCED EXPORT STATE
   // ==========================================================================
-  const [statusFilter, setStatusFilter] = useState('all'); // all | pending | cleared | partial
+  // Scope: 'month' (Single Month) | 'range' (Month Range) | 'all_history' (Lifetime)
+  const [scope, setScope] = useState('month');
+  const [fromMonth, setFromMonth] = useState('');
+  const [toMonth, setToMonth] = useState('');
+
+  // Daily Filter
+  const [dayNumber, setDayNumber] = useState('');
+  const [dayStatus, setDayStatus] = useState('all'); // all | paid | unpaid
+  const [recoveryFilter, setRecoveryFilter] = useState('all'); // all | critical | moderate | near_clear | cleared
+
+  // PDF View Modality
+  const [pdfViewMode, setPdfViewMode] = useState('summary'); // 'summary' | 'split_1_15' | 'split_16_31' | 'all_days' | 'field_sheet'
+
+  const [statusFilter, setStatusFilter] = useState('all'); // all | pending | cleared | partial | zero | excess
   const [fromSlNo, setFromSlNo] = useState('');
   const [toSlNo, setToSlNo] = useState('');
   const [villageFilter, setVillageFilter] = useState('');
@@ -89,20 +113,25 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
   const [exportingExcel, setExportingExcel] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
 
-  // Cached distinct villages for active month (stable options list — set once per month, never mutated by filter changes)
+  // Cached distinct villages for active month
   const [monthVillages, setMonthVillages] = useState([]);
   const monthVillagesRef = React.useRef([]);
 
   useEffect(() => {
     setMonthVillages([]);
     monthVillagesRef.current = [];
-  }, [selectedMonth]);
+  }, [selectedMonth, scope]);
 
-  // Stable village list — only depends on monthVillages state (never on transient previewData)
   const availableVillages = useMemo(() => monthVillages, [monthVillages]);
 
   // Check if any non-default filter is currently active
   const hasActiveFilters = Boolean(
+    scope !== 'month' ||
+    fromMonth ||
+    toMonth ||
+    dayNumber ||
+    dayStatus !== 'all' ||
+    recoveryFilter !== 'all' ||
     statusFilter !== 'all' ||
     (fromSlNo && fromSlNo.trim() !== '') ||
     (toSlNo && toSlNo.trim() !== '') ||
@@ -116,6 +145,13 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
 
   // Reset all filters in one click
   const handleResetFilters = () => {
+    setScope('month');
+    setFromMonth('');
+    setToMonth('');
+    setDayNumber('');
+    setDayStatus('all');
+    setRecoveryFilter('all');
+    setPdfViewMode('summary');
     setStatusFilter('all');
     setFromSlNo('');
     setToSlNo('');
@@ -141,7 +177,10 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
     setPreviewError('');
     try {
       const params = new URLSearchParams({
+        scope,
         month_year: selectedMonth,
+        from_month: fromMonth || '',
+        to_month: toMonth || '',
         status: statusFilter,
         village: villageFilter,
         search: searchQuery,
@@ -150,7 +189,10 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
         from_sl_no: fromSlNo ? fromSlNo.trim() : '',
         to_sl_no: toSlNo ? toSlNo.trim() : '',
         sort_by: sortBy,
-        sort_order: sortOrder
+        sort_order: sortOrder,
+        day_number: dayNumber || '',
+        day_status: dayStatus,
+        recovery_filter: recoveryFilter
       });
 
       const res = await fetch(`/api/reports/export-preview?${params.toString()}`, {
@@ -159,7 +201,6 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
       const data = await res.json();
       if (data.success) {
         setPreviewData(data);
-        // Populate village list exactly once per month — prevents dropdown re-render during user interaction
         if (Array.isArray(data.villages) && data.villages.length > 0 && monthVillagesRef.current.length === 0) {
           monthVillagesRef.current = data.villages;
           setMonthVillages(data.villages);
@@ -176,7 +217,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
         setPreviewLoading(false);
       }
     }
-  }, [selectedMonth, statusFilter, villageFilter, searchQuery, minPrincipal, maxPrincipal, fromSlNo, toSlNo, sortBy, sortOrder]);
+  }, [selectedMonth, scope, fromMonth, toMonth, statusFilter, villageFilter, searchQuery, minPrincipal, maxPrincipal, fromSlNo, toSlNo, sortBy, sortOrder, dayNumber, dayStatus, recoveryFilter]);
 
   useEffect(() => {
     if (activeTab === 'export') {
@@ -187,7 +228,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
     }
   }, [activeTab, fetchExportPreview]);
 
-  // Cleanup AbortController on unmount to prevent memory leaks
+  // Cleanup AbortController on unmount
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -210,9 +251,12 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
       return;
     }
     setExportingExcel(true);
-    showToast(lang === 'ta' ? 'Excel கோப்பு தயாராகிறது...' : 'Generating Excel (.xlsx)...', 'info');
+    showToast(lang === 'ta' ? '6-தாள்கள் கொண்ட விரிவான Excel கோப்பு தயாராகிறது...' : 'Generating 6-Sheet Production Excel (.xlsx)...', 'info');
     const params = new URLSearchParams({
+      scope,
       month_year: selectedMonth,
+      from_month: fromMonth || '',
+      to_month: toMonth || '',
       status: statusFilter,
       village: villageFilter,
       search: searchQuery,
@@ -221,12 +265,15 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
       from_sl_no: fromSlNo ? fromSlNo.trim() : '',
       to_sl_no: toSlNo ? toSlNo.trim() : '',
       sort_by: sortBy,
-      sort_order: sortOrder
+      sort_order: sortOrder,
+      day_number: dayNumber || '',
+      day_status: dayStatus,
+      recovery_filter: recoveryFilter
     });
     window.location.href = `/api/excel/export-filtered?${params.toString()}`;
     setTimeout(() => {
       setExportingExcel(false);
-      showToast(lang === 'ta' ? 'Excel கோப்பு வெற்றிகரமாக பதிவிறக்கப்பட்டது!' : 'Excel file downloaded successfully!', 'success');
+      showToast(lang === 'ta' ? 'Excel கோப்பு வெற்றிகரமாக பதிவிறக்கப்பட்டது!' : 'Production Excel file downloaded successfully!', 'success');
     }, 1800);
   };
 
@@ -239,22 +286,45 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
     setExportingPdf(true);
     showToast(lang === 'ta' ? 'வண்ண PDF ஆவணம் தயாராகிறது...' : 'Rendering high-resolution vector PDF...', 'info');
     try {
-      downloadRegisterPdf({
-        rows: previewData.rows,
-        summary: previewData.summary || {},
-        filters: {
-          status: statusFilter,
-          from_sl_no: fromSlNo,
-          to_sl_no: toSlNo,
-          village: villageFilter,
-          minPrincipal: minPrincipal ? Number(minPrincipal) : 0,
-          maxPrincipal: maxPrincipal ? Number(maxPrincipal) : Infinity
-        },
-        monthYear: selectedMonth,
-        companyName: company?.name || 'ALR Finance',
-        showDays,
-        totalDays: previewData.total_days || monthDays
-      });
+      if (pdfViewMode === 'field_sheet') {
+        const effectiveDay = dayNumber ? Number(dayNumber) : new Date().getDate();
+        const effectiveDate = `${selectedMonth}-${String(effectiveDay).padStart(2, '0')}`;
+        downloadFieldCollectionSheetPdf({
+          rows: previewData.rows,
+          dayNumber: effectiveDay,
+          collectionDate: effectiveDate,
+          companyName: company?.name || 'ALR Finance',
+          villageFilter
+        });
+      } else if (scope === 'all_history') {
+        downloadAllHistoryPdf({
+          borrowers: previewData.rows,
+          companyName: company?.name || 'ALR Finance',
+          dateRangeLabel: 'LIFETIME ALL HISTORY',
+          summary: previewData.summary || {}
+        });
+      } else {
+        downloadRegisterPdf({
+          rows: previewData.rows,
+          summary: previewData.summary || {},
+          filters: {
+            status: statusFilter,
+            from_sl_no: fromSlNo,
+            to_sl_no: toSlNo,
+            village: villageFilter,
+            minPrincipal: minPrincipal ? Number(minPrincipal) : 0,
+            maxPrincipal: maxPrincipal ? Number(maxPrincipal) : Infinity,
+            day_number: dayNumber,
+            day_status: dayStatus
+          },
+          monthYear: scope === 'range' && fromMonth && toMonth ? `${fromMonth} to ${toMonth}` : selectedMonth,
+          scope,
+          viewMode: pdfViewMode,
+          companyName: company?.name || 'ALR Finance',
+          showDays,
+          totalDays: previewData.total_days || monthDays
+        });
+      }
       showToast(lang === 'ta' ? 'PDF வெற்றிகரமாக பதிவிறக்கப்பட்டது!' : 'Color PDF downloaded successfully!', 'success');
     } catch (err) {
       showToast(err.message || 'Error generating PDF', 'error');
@@ -712,6 +782,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
       </div>
 
       {/* ================================================================== */}
+      {/* ================================================================== */}
       {/* TAB 1: ADVANCED MULTI-FILTER EXPORT (PDF & EXCEL)                  */}
       {/* ================================================================== */}
       {activeTab === 'export' && (
@@ -719,11 +790,13 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
 
           {/* Filter Control Box */}
           <div className="card no-print" style={{ display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '3px solid var(--indigo-primary)', boxShadow: 'var(--shadow-sm)' }}>
+            
+            {/* Header with Title and Actions */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <SlidersHorizontal size={18} color="var(--indigo-primary)" />
                 <h2 style={{ fontSize: '15px', fontWeight: 800, margin: 0 }}>
-                  {lang === 'ta' ? 'ஏற்றுமதி வடிகட்டிகள் (Advanced Export Filters)' : 'Advanced Export Filters'}
+                  {lang === 'ta' ? 'ஏற்றுமதி வடிகட்டிகள் & வடிவமைப்பு (Export Filters & Formats)' : 'Advanced Export Filters & Formats'}
                 </h2>
                 {previewLoading && (
                   <span style={{ fontSize: '11px', color: 'var(--indigo-primary)', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
@@ -761,8 +834,146 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
               </div>
             </div>
 
+            {/* Scope Switcher Bar (Month / Multi-Month Range / Lifetime All-History) */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '12px',
+              padding: '10px 14px',
+              background: 'var(--bg-surface-hover)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-subtle)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <CalendarRange size={16} color="var(--indigo-primary)" />
+                <span style={{ fontSize: '12px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                  {lang === 'ta' ? 'கால வரம்பு (Scope):' : 'Export Timeframe Scope:'}
+                </span>
+                <div style={{ display: 'inline-flex', background: 'var(--bg-surface)', padding: '2px', borderRadius: '8px', border: '1px solid var(--border-subtle)', gap: '3px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setScope('month')}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      fontSize: '11.5px',
+                      fontWeight: scope === 'month' ? 800 : 600,
+                      background: scope === 'month' ? 'var(--indigo-primary)' : 'transparent',
+                      color: scope === 'month' ? '#FFFFFF' : 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <Calendar size={12} />
+                    <span>{lang === 'ta' ? 'ஒற்றை மாதம்' : 'Single Month'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScope('range')}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      fontSize: '11.5px',
+                      fontWeight: scope === 'range' ? 800 : 600,
+                      background: scope === 'range' ? 'var(--indigo-primary)' : 'transparent',
+                      color: scope === 'range' ? '#FFFFFF' : 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <CalendarRange size={12} />
+                    <span>{lang === 'ta' ? 'மாத வரம்பு (Range)' : 'Multi-Month Range'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScope('all_history')}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '6px',
+                      border: 'none',
+                      fontSize: '11.5px',
+                      fontWeight: scope === 'all_history' ? 800 : 600,
+                      background: scope === 'all_history' ? 'var(--indigo-primary)' : 'transparent',
+                      color: scope === 'all_history' ? '#FFFFFF' : 'var(--text-secondary)',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px'
+                    }}
+                  >
+                    <Clock size={12} />
+                    <span>{lang === 'ta' ? 'வாழ்நாள் வரலாறு (All History)' : 'Lifetime (All History)'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Scope Date Inputs */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {scope === 'month' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                      {lang === 'ta' ? 'மாதம்:' : 'Month:'}
+                    </label>
+                    <input
+                      type="month"
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      className="input font-mono"
+                      style={{ height: '30px', fontSize: '12px', fontWeight: 800, padding: '0 8px' }}
+                    />
+                  </div>
+                )}
+                {scope === 'range' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                      {lang === 'ta' ? 'முதல்:' : 'From:'}
+                    </label>
+                    <input
+                      type="month"
+                      value={fromMonth}
+                      onChange={(e) => setFromMonth(e.target.value)}
+                      className="input font-mono"
+                      style={{ height: '30px', fontSize: '12px', fontWeight: 800, padding: '0 8px' }}
+                    />
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>→</span>
+                    <label style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                      {lang === 'ta' ? 'வரை:' : 'To:'}
+                    </label>
+                    <input
+                      type="month"
+                      value={toMonth}
+                      onChange={(e) => setToMonth(e.target.value)}
+                      className="input font-mono"
+                      style={{ height: '30px', fontSize: '12px', fontWeight: 800, padding: '0 8px' }}
+                    />
+                  </div>
+                )}
+                {scope === 'all_history' && (
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    color: 'var(--emerald-primary)',
+                    background: 'rgba(16, 185, 129, 0.1)',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid rgba(16, 185, 129, 0.25)'
+                  }}>
+                    ✓ {lang === 'ta' ? 'முழு வாழ்நாள் தரவு' : 'Lifetime Audit Mode'}
+                  </span>
+                )}
+              </div>
+            </div>
+
             {/* Filter Inputs Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px' }}>
               {/* Status Filter */}
               <div>
                 <label htmlFor="filter-loan-status" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
@@ -792,13 +1003,13 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
               {/* Serial Number / Client Code Range */}
               <div>
                 <label htmlFor="filter-from-sl" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
-                  {lang === 'ta' ? 'எண் / குறியீடு வரம்பு (Sl # / Code Range)' : 'Serial # / Client Code Range (From - To)'}
+                  {lang === 'ta' ? 'எண் / குறியீடு வரம்பு (Sl # / Code Range)' : 'Serial # / Client Code Range'}
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <input
                     id="filter-from-sl"
                     type="text"
-                    placeholder={lang === 'ta' ? 'முதல் (எ.கா. 1, snop01)' : 'From (e.g. 1 or snop01)'}
+                    placeholder={lang === 'ta' ? 'முதல் (எ.கா. 1)' : 'From (e.g. 1)'}
                     value={fromSlNo}
                     onChange={(e) => setFromSlNo(e.target.value)}
                     className="input font-mono"
@@ -809,7 +1020,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                     id="filter-to-sl"
                     aria-label="To Serial No or Client Code"
                     type="text"
-                    placeholder={lang === 'ta' ? 'வரை (எ.கா. 50, snop65d)' : 'To (e.g. 50 or snop65d)'}
+                    placeholder={lang === 'ta' ? 'வரை (எ.கா. 50)' : 'To (e.g. 50)'}
                     value={toSlNo}
                     onChange={(e) => setToSlNo(e.target.value)}
                     className="input font-mono"
@@ -818,7 +1029,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                 </div>
               </div>
 
-              {/* Village / Area Filter (Auto-Adopting Dropdown with count & clear) */}
+              {/* Village / Area Filter */}
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
                   <label htmlFor="filter-village-area" style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)' }}>
@@ -934,7 +1145,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                 </div>
               </div>
 
-              {/* Sorting & Format */}
+              {/* Sorting & Direction */}
               <div>
                 <label htmlFor="filter-sort-by" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
                   {lang === 'ta' ? 'வரிசைப்படுத்துதல் & பார்வை' : 'Sort By & Format'}
@@ -968,6 +1179,259 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
               </div>
             </div>
 
+            {/* Daily Data & Recovery Filters Row */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+              gap: '12px',
+              padding: '10px 12px',
+              background: 'rgba(99, 102, 241, 0.03)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px dashed var(--border-subtle)'
+            }}>
+              {/* Specific Day Number Filter (1-31) */}
+              <div>
+                <label htmlFor="filter-day-number" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                  {lang === 'ta' ? '📅 நாள் வடிகட்டி (Day 1-31)' : '📅 Daily Collection Filter (Day 1-31)'}
+                </label>
+                <select
+                  id="filter-day-number"
+                  value={dayNumber}
+                  onChange={(e) => setDayNumber(e.target.value)}
+                  className="input"
+                  style={{
+                    width: '100%',
+                    height: '36px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    backgroundColor: dayNumber ? 'rgba(99, 102, 241, 0.08)' : undefined,
+                    borderColor: dayNumber ? 'var(--indigo-primary)' : undefined
+                  }}
+                >
+                  <option value="">{lang === 'ta' ? 'அனைத்து நாட்களும் (All Days)' : 'All Days (1-31)'}</option>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                    <option key={d} value={String(d)}>
+                      {lang === 'ta' ? `நாள் ${d} (Day ${d})` : `Day ${d} Collection`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Day Payment Status (Paid vs Unpaid / Defaulter) */}
+              <div>
+                <label htmlFor="filter-day-status" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                  {lang === 'ta' ? '⚡ அன்றைய வசூல் நிலை (Day Status)' : '⚡ Day Status (Paid vs Defaulters)'}
+                </label>
+                <select
+                  id="filter-day-status"
+                  value={dayStatus}
+                  onChange={(e) => setDayStatus(e.target.value)}
+                  className="input"
+                  style={{
+                    width: '100%',
+                    height: '36px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    backgroundColor: dayStatus !== 'all' ? (dayStatus === 'unpaid' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(16, 185, 129, 0.08)') : undefined,
+                    borderColor: dayStatus !== 'all' ? (dayStatus === 'unpaid' ? '#DC2626' : 'var(--emerald-primary)') : undefined
+                  }}
+                >
+                  <option value="all">{lang === 'ta' ? '👥 அனைத்து நபர்களும்' : '👥 All Clients'}</option>
+                  <option value="paid">{lang === 'ta' ? '🟢 அன்றைய நாளில் வசூலானவர்கள்' : '🟢 Paid on Selected Day'}</option>
+                  <option value="unpaid">{lang === 'ta' ? '🔴 அன்றைய தவணை செலுத்தாதவர்கள் (Defaulters)' : '🔴 Unpaid / Defaulters on Day'}</option>
+                </select>
+              </div>
+
+              {/* Recovery Rate Filter */}
+              <div>
+                <label htmlFor="filter-recovery" style={{ display: 'block', fontSize: '11px', fontWeight: 700, marginBottom: '4px', color: 'var(--text-secondary)' }}>
+                  {lang === 'ta' ? '📈 வசூல் சதவீதம் (Recovery Rate)' : '📈 Recovery Rate Tier'}
+                </label>
+                <select
+                  id="filter-recovery"
+                  value={recoveryFilter}
+                  onChange={(e) => setRecoveryFilter(e.target.value)}
+                  className="input"
+                  style={{
+                    width: '100%',
+                    height: '36px',
+                    fontSize: '12.5px',
+                    fontWeight: 600,
+                    backgroundColor: recoveryFilter !== 'all' ? 'rgba(245, 158, 11, 0.08)' : undefined,
+                    borderColor: recoveryFilter !== 'all' ? '#D97706' : undefined
+                  }}
+                >
+                  <option value="all">{lang === 'ta' ? '📊 அனைத்து சதவீதமும் (All %)' : '📊 All Recovery Rates'}</option>
+                  <option value="lt_50">{lang === 'ta' ? '⚠️ 50% க்கும் குறைவு (High Risk)' : '⚠️ < 50% Recovery (High Risk)'}</option>
+                  <option value="50_90">{lang === 'ta' ? '🟡 50% - 90% (Moderate)' : '🟡 50% - 90% Recovery'}</option>
+                  <option value="gte_90">{lang === 'ta' ? '🟢 90% மற்றும் அதிகம் (Near Clear)' : '🟢 ≥ 90% Recovery'}</option>
+                  <option value="100">{lang === 'ta' ? '✅ 100% முடிந்தது (Fully Cleared)' : '✅ 100% Fully Cleared'}</option>
+                </select>
+              </div>
+            </div>
+
+            {/* PDF Layout Selector Card (Zero-Squish Vector Views) */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              padding: '12px 14px',
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.03) 0%, rgba(99, 102, 241, 0.03) 100%)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid rgba(239, 68, 68, 0.2)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <FileDown size={16} color="#DC2626" />
+                  <span style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                    {lang === 'ta' ? 'PDF ஆவண வடிவமைப்பு & பார்வை (PDF Vector Layout Mode):' : 'PDF Document Layout & View Mode:'}
+                  </span>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                    {lang === 'ta' ? '(நெரிசல் இல்லாத தெளிவான அச்சிடும் வடிவங்கள்)' : '(Zero-squish, high-contrast vector print layouts)'}
+                  </span>
+                </div>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: '#DC2626' }}>
+                  {pdfViewMode === 'summary' && '✓ Wide 10-Col Executive Summary (Recommended)'}
+                  {pdfViewMode === 'split_1_15' && '✓ Split Days 1-15 Landscape (Comfortable 9.5mm cols)'}
+                  {pdfViewMode === 'split_16_31' && '✓ Split Days 16-31 Landscape (Comfortable 9mm cols)'}
+                  {pdfViewMode === 'all_days' && '✓ Full 1-31 Days Ledger Landscape'}
+                  {pdfViewMode === 'field_sheet' && '✓ Field Agent Daily Run Sheet with Signatures'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setPdfViewMode('summary')}
+                  style={{
+                    flex: '1 1 140px',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: pdfViewMode === 'summary' ? '1.5px solid #DC2626' : '1px solid var(--border-subtle)',
+                    background: pdfViewMode === 'summary' ? '#DC2626' : 'var(--bg-surface)',
+                    color: pdfViewMode === 'summary' ? '#FFFFFF' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '2px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>📊 {lang === 'ta' ? 'சுருக்க அறிக்கை' : 'Executive Summary'}</span>
+                  <span style={{ fontSize: '10px', opacity: 0.85, fontWeight: 500 }}>
+                    {lang === 'ta' ? '10 அகல நெடுவரிசைகள்' : '10 Wide Columns (Clean)'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPdfViewMode('split_1_15')}
+                  style={{
+                    flex: '1 1 140px',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: pdfViewMode === 'split_1_15' ? '1.5px solid #DC2626' : '1px solid var(--border-subtle)',
+                    background: pdfViewMode === 'split_1_15' ? '#DC2626' : 'var(--bg-surface)',
+                    color: pdfViewMode === 'split_1_15' ? '#FFFFFF' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '2px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>✂️ {lang === 'ta' ? 'பகுதி 1 (நாள் 1-15)' : 'Split Days 1-15'}</span>
+                  <span style={{ fontSize: '10px', opacity: 0.85, fontWeight: 500 }}>
+                    {lang === 'ta' ? '9.5mm அகல கட்டங்கள்' : '9.5mm Day Columns'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPdfViewMode('split_16_31')}
+                  style={{
+                    flex: '1 1 140px',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: pdfViewMode === 'split_16_31' ? '1.5px solid #DC2626' : '1px solid var(--border-subtle)',
+                    background: pdfViewMode === 'split_16_31' ? '#DC2626' : 'var(--bg-surface)',
+                    color: pdfViewMode === 'split_16_31' ? '#FFFFFF' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '2px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>✂️ {lang === 'ta' ? 'பகுதி 2 (நாள் 16-31)' : 'Split Days 16-31'}</span>
+                  <span style={{ fontSize: '10px', opacity: 0.85, fontWeight: 500 }}>
+                    {lang === 'ta' ? '9.0mm அகல கட்டங்கள்' : '9.0mm Day Columns'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPdfViewMode('all_days')}
+                  style={{
+                    flex: '1 1 140px',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: pdfViewMode === 'all_days' ? '1.5px solid #DC2626' : '1px solid var(--border-subtle)',
+                    background: pdfViewMode === 'all_days' ? '#DC2626' : 'var(--bg-surface)',
+                    color: pdfViewMode === 'all_days' ? '#FFFFFF' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '2px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>📋 {lang === 'ta' ? 'அனைத்து நாட்களும் (1-31)' : 'All Days (1-31)'}</span>
+                  <span style={{ fontSize: '10px', opacity: 0.85, fontWeight: 500 }}>
+                    {lang === 'ta' ? 'முழு பதிவேடு லேண்ட்ஸ்கேப்' : 'Full ALR Ledger Sheet'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPdfViewMode('field_sheet')}
+                  style={{
+                    flex: '1 1 140px',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    border: pdfViewMode === 'field_sheet' ? '1.5px solid #DC2626' : '1px solid var(--border-subtle)',
+                    background: pdfViewMode === 'field_sheet' ? '#DC2626' : 'var(--bg-surface)',
+                    color: pdfViewMode === 'field_sheet' ? '#FFFFFF' : 'var(--text-primary)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '2px',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <span>🏃 {lang === 'ta' ? 'கள வசூல் தாள்' : 'Field Run Sheet'}</span>
+                  <span style={{ fontSize: '10px', opacity: 0.85, fontWeight: 500 }}>
+                    {lang === 'ta' ? 'ஏஜென்ட் கையொப்பத்துடன்' : 'Agent Daily Checklist'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
             {/* Quick Presets Row */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', paddingTop: '8px', borderTop: '1px dashed var(--border-subtle)' }}>
               <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
@@ -975,7 +1439,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                   <Hash size={12} />
                   {lang === 'ta' ? 'விரைவு தேர்வுகள்:' : 'Quick Presets:'}
                 </span>
-                <PresetChip label="All (அனைத்தும்)" active={!fromSlNo && !toSlNo && statusFilter === 'all' && !villageFilter} onClick={() => { handleSetSlRange('', ''); setStatusFilter('all'); setVillageFilter(''); }} />
+                <PresetChip label="All (அனைத்தும்)" active={!fromSlNo && !toSlNo && statusFilter === 'all' && !villageFilter && !dayNumber && dayStatus === 'all' && recoveryFilter === 'all'} onClick={() => { handleSetSlRange('', ''); setStatusFilter('all'); setVillageFilter(''); setDayNumber(''); setDayStatus('all'); setRecoveryFilter('all'); }} />
                 <PresetChip label="1 - 10" active={fromSlNo === '1' && toSlNo === '10'} onClick={() => handleSetSlRange(1, 10)} />
                 <PresetChip label="1 - 20" active={fromSlNo === '1' && toSlNo === '20'} onClick={() => handleSetSlRange(1, 20)} />
                 <PresetChip label="1 - 50" active={fromSlNo === '1' && toSlNo === '50'} onClick={() => handleSetSlRange(1, 50)} />
@@ -998,7 +1462,6 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                 />
                 <PresetChip label="101 - 150" active={fromSlNo === '101' && toSlNo === '150'} onClick={() => handleSetSlRange(101, 150)} />
                 <PresetChip label="151 - 200" active={fromSlNo === '151' && toSlNo === '200'} onClick={() => handleSetSlRange(151, 200)} />
-                <PresetChip label="201 - 300" active={fromSlNo === '201' && toSlNo === '300'} onClick={() => handleSetSlRange(201, 300)} />
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1009,7 +1472,7 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                     onChange={(e) => setShowDays(e.target.checked)}
                     style={{ width: '15px', height: '15px', cursor: 'pointer' }}
                   />
-                  <span>{lang === 'ta' ? 'நாள் 1-31 விரிவான நெடுவரிசைகள்' : 'Show Days 1-31 Columns'}</span>
+                  <span>{lang === 'ta' ? 'நாள் 1-31 விரிவான நெடுவரிசைகள்' : 'Show Days 1-31 Columns in Table'}</span>
                 </label>
               </div>
             </div>
@@ -1075,6 +1538,9 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                 fontSize: '11px'
               }}>
                 <span style={{ fontWeight: 700, color: 'var(--text-muted)' }}>{lang === 'ta' ? 'செயலில் உள்ள வடிகட்டிகள்:' : 'Active Scope:'}</span>
+                {scope !== 'month' && (
+                  <ActiveFilterTag label={`Scope: ${scope === 'all_history' ? 'Lifetime History' : `${fromMonth} → ${toMonth}`}`} onRemove={() => setScope('month')} />
+                )}
                 {statusFilter !== 'all' && (
                   <ActiveFilterTag label={`Status: ${statusFilter}`} onRemove={() => setStatusFilter('all')} />
                 )}
@@ -1089,6 +1555,15 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                 )}
                 {(minPrincipal || maxPrincipal) && (
                   <ActiveFilterTag label={`₹${minPrincipal || 0} - ₹${maxPrincipal || 'Max'}`} onRemove={() => { setMinPrincipal(''); setMaxPrincipal(''); }} />
+                )}
+                {dayNumber && (
+                  <ActiveFilterTag label={`Day: ${dayNumber}`} onRemove={() => setDayNumber('')} />
+                )}
+                {dayStatus !== 'all' && (
+                  <ActiveFilterTag label={`Day Status: ${dayStatus}`} onRemove={() => setDayStatus('all')} />
+                )}
+                {recoveryFilter !== 'all' && (
+                  <ActiveFilterTag label={`Recovery: ${recoveryFilter}`} onRemove={() => setRecoveryFilter('all')} />
                 )}
                 <button
                   type="button"
@@ -1113,32 +1588,46 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
             <div style={{
               display: 'flex',
               flexWrap: 'wrap',
-              gap: '10px',
-              paddingTop: '10px',
+              gap: '12px',
+              paddingTop: '12px',
               borderTop: '1px solid var(--border-subtle)'
             }}>
-              {/* Button 1: Download Filtered Excel */}
+              {/* Button 1: Download Filtered Excel (6 Sheets with formulas) */}
               <button
                 type="button"
                 onClick={handleDownloadFilteredExcel}
                 disabled={exportingExcel || previewLoading}
                 className="btn btn-emerald"
-                style={{ flex: '1 1 200px', height: '44px', fontWeight: 800, gap: '8px', fontSize: '13px' }}
+                style={{ flex: '1 1 240px', height: '46px', fontWeight: 800, gap: '10px', fontSize: '13px' }}
               >
                 {exportingExcel ? <RefreshCw size={18} className="spin" /> : <FileSpreadsheet size={18} />}
-                <span>{exportingExcel ? (lang === 'ta' ? 'தயாராகிறது...' : 'Generating...') : (lang === 'ta' ? 'எக்செல் பதிவிறக்கம் (.xlsx)' : 'Export Excel (.xlsx)')}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.2 }}>
+                  <span>{exportingExcel ? (lang === 'ta' ? 'எக்செல் உருவாகிறது...' : 'Generating 6 Sheets...') : (lang === 'ta' ? 'விரிவான எக்செல் (6 Sheets .xlsx)' : 'Export 6-Sheet Production Excel')}</span>
+                  <span style={{ fontSize: '10px', opacity: 0.85, fontWeight: 500 }}>
+                    {lang === 'ta' ? 'சூத்திரங்கள் + பகுப்பாய்வு + நிலுவைப்பட்டியல்' : 'Formulas • Days 1-31 • Analytics • Defaulters'}
+                  </span>
+                </div>
               </button>
 
-              {/* Button 2: Download Filtered PDF */}
+              {/* Button 2: Download Filtered PDF (Vector High Res) */}
               <button
                 type="button"
                 onClick={handleDownloadPdf}
                 disabled={exportingPdf || previewLoading}
                 className="btn btn-rose"
-                style={{ flex: '1 1 200px', height: '44px', fontWeight: 800, gap: '8px', background: '#DC2626', color: '#FFFFFF', fontSize: '13px' }}
+                style={{ flex: '1 1 240px', height: '46px', fontWeight: 800, gap: '10px', background: '#DC2626', color: '#FFFFFF', fontSize: '13px' }}
               >
                 {exportingPdf ? <RefreshCw size={18} className="spin" /> : <FileDown size={18} />}
-                <span>{exportingPdf ? (lang === 'ta' ? 'PDF தயாராகிறது...' : 'Rendering PDF...') : (lang === 'ta' ? 'வண்ண PDF பதிவிறக்கம் (.pdf)' : 'Export Color PDF (.pdf)')}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.2 }}>
+                  <span>{exportingPdf ? (lang === 'ta' ? 'PDF தயாராகிறது...' : 'Rendering Vector PDF...') : (lang === 'ta' ? 'வண்ண வெக்டர் PDF (.pdf)' : 'Export Color Vector PDF')}</span>
+                  <span style={{ fontSize: '10px', opacity: 0.85, fontWeight: 500 }}>
+                    {pdfViewMode === 'summary' && '10-Col Executive Summary'}
+                    {pdfViewMode === 'split_1_15' && 'Split Days 1-15 (Wide)'}
+                    {pdfViewMode === 'split_16_31' && 'Split Days 16-31 (Wide)'}
+                    {pdfViewMode === 'all_days' && 'Full 1-31 Days Ledger'}
+                    {pdfViewMode === 'field_sheet' && 'Field Agent Run Sheet'}
+                  </span>
+                </div>
               </button>
 
               {/* Button 3: Window Print / Save as PDF */}
@@ -1146,11 +1635,14 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                 type="button"
                 onClick={handlePrint}
                 className="btn btn-secondary"
-                style={{ flex: '1 1 180px', height: '44px', fontWeight: 800, gap: '8px', fontSize: '13px' }}
+                style={{ flex: '1 1 180px', height: '46px', fontWeight: 800, gap: '8px', fontSize: '13px' }}
                 title={lang === 'ta' ? 'அச்சிடு / தமிழ் எழுத்துருக்களுடன் PDF சேமி' : 'Print / Save PDF (Full Tamil Font Preservation)'}
               >
                 <Printer size={18} />
-                <span>{lang === 'ta' ? 'அச்சிடு (Print / Save)' : 'Print / Save as PDF'}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.2 }}>
+                  <span>{lang === 'ta' ? 'அச்சிடு (Print / Save)' : 'Print / Save as PDF'}</span>
+                  <span style={{ fontSize: '10px', opacity: 0.7, fontWeight: 500 }}>Browser Native High-Res</span>
+                </div>
               </button>
             </div>
           </div>
@@ -1181,6 +1673,11 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
               rows={previewData?.rows || []}
               totalDays={previewData?.total_days || monthDays}
               monthYear={selectedMonth}
+              scope={scope}
+              scopeLabel={scope === 'all_history' ? (lang === 'ta' ? 'வாழ்நாள் முழு வரலாறு (Lifetime All History)' : 'Lifetime All History') : scope === 'range' && fromMonth && toMonth ? `${fromMonth} → ${toMonth}` : selectedMonth}
+              viewMode={pdfViewMode}
+              dayNumber={dayNumber}
+              dayStatus={dayStatus}
               showDays={showDays}
               summary={previewData?.summary || {}}
               columnSums={previewData?.column_sums || {}}
@@ -1190,7 +1687,10 @@ export default function ExcelPage({ activeMonth, onDataChanged }) {
                 to_sl_no: toSlNo,
                 village: villageFilter,
                 minPrincipal,
-                maxPrincipal
+                maxPrincipal,
+                day_number: dayNumber,
+                day_status: dayStatus,
+                recovery_filter: recoveryFilter
               }}
               companyName={company?.name || 'ALR Finance'}
               isLoading={previewLoading}
